@@ -1,17 +1,18 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useState, useCallback } from 'react';
 import { Play, Users, ArrowRight, Activity, Cpu, Eye, Zap, Terminal, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
-const agentMetadata: Record<string, { name: string; role: string; emoji: string; color: string }> = {
-  'opus': { name: 'CEO', role: 'Chef des Opérations', emoji: '🎩', color: '#f59e0b' },
-  'brain': { name: 'Kira', role: 'Chef de Recherche', emoji: '🧠', color: '#8b5cf6' },
-  'growth': { name: 'Madara', role: 'Spécialiste Croissance', emoji: '👁️', color: '#22c55e' },
-  'creator': { name: 'Stark', role: 'Directeur Créatif', emoji: '🎨', color: '#ec4899' },
-  'twitter-alt': { name: 'L', role: 'Directeur Réseaux Sociaux', emoji: '⚡', color: '#3b82f6' },
-  'company-observer': { name: 'Usopp', role: 'Auditeur Opérations', emoji: '🎯', color: '#ef4444' },
+const agentMetadata: Record<string, { name: string; role: string; emoji: string; avatar: string; color: string }> = {
+  'opus': { name: 'CEO', role: 'Chef des Opérations', emoji: '🎩', avatar: '/agents/opus.png', color: '#f59e0b' },
+  'brain': { name: 'Kira', role: 'Chef de Recherche', emoji: '🧠', avatar: '/agents/brain.png', color: '#8b5cf6' },
+  'growth': { name: 'Madara', role: 'Spécialiste Croissance', emoji: '👁️', avatar: '/agents/growth.png', color: '#22c55e' },
+  'creator': { name: 'Stark', role: 'Directeur Créatif', emoji: '🎨', avatar: '/agents/creator.jpg', color: '#ec4899' },
+  'twitter-alt': { name: 'L', role: 'Directeur Réseaux Sociaux', emoji: '⚡', avatar: '/agents/twitter-alt.jpg', color: '#3b82f6' },
+  'company-observer': { name: 'Usopp', role: 'Auditeur Opérations', emoji: '🎯', avatar: '/agents/company-observer.png', color: '#ef4444' },
 };
 
 const ASCII_LOGO = `
@@ -69,6 +70,7 @@ export default function HomePage() {
             role: meta?.role || 'Agent',
             status: isActive ? 'active' : 'idle',
             emoji: meta?.emoji || '🤖',
+            avatar: meta?.avatar || '/agents/opus.png',
             color: meta?.color || '#888',
             ops: opsCount,
             level: stat.level,
@@ -200,8 +202,9 @@ export default function HomePage() {
                   style={{ borderColor: `${agent.color}20` }}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <span className={`status-dot ${getStatusDot(agent.status)}`} />
+                    <Image src={agent.avatar} alt={agent.name} width={20} height={20} className="w-5 h-5 rounded-full object-cover" />
                     <span className="text-xs font-medium text-white">{agent.name}</span>
+                    <span className={`status-dot ${getStatusDot(agent.status)}`} />
                   </div>
                   <div className="text-[10px] text-hacker-muted mb-1">{agent.role}</div>
                   <div className="flex items-center justify-between">

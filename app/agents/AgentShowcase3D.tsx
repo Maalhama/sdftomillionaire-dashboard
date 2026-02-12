@@ -63,7 +63,6 @@ function ShowcaseAgent({ modelPath, agentColor }: { modelPath: string; agentColo
         <ringGeometry args={[0.4, 0.55, 48]} />
         <meshBasicMaterial color={agentColor} transparent opacity={0.35} side={THREE.DoubleSide} />
       </mesh>
-      <pointLight color={agentColor} intensity={0.8} distance={4} position={[0, 2, 0]} />
     </group>
   );
 }

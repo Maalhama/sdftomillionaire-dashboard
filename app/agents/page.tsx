@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { supabase, AGENTS, AgentId } from '@/lib/supabase';
 import { Shield, Globe, Zap } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -38,6 +39,15 @@ const agentColors: Record<string, string> = {
   creator: '#ec4899',
   'twitter-alt': '#3b82f6',
   'company-observer': '#ef4444',
+};
+
+const agentAvatars: Record<string, string> = {
+  opus: '/agents/opus.png',
+  brain: '/agents/brain.png',
+  growth: '/agents/growth.png',
+  creator: '/agents/creator.jpg',
+  'twitter-alt': '/agents/twitter-alt.jpg',
+  'company-observer': '/agents/company-observer.png',
 };
 
 const agentModelPaths: Record<string, string> = {
@@ -274,10 +284,10 @@ export default function AgentsPage() {
             {/* Agent identity bar */}
             <div className="px-4 py-2.5 flex items-center gap-3 border-t border-hacker-border bg-hacker-terminal">
               <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-base border-2 shrink-0"
+                className="w-8 h-8 rounded-full overflow-hidden border-2 shrink-0"
                 style={{ borderColor: color, boxShadow: `0 0 8px ${color}33` }}
               >
-                {agent.emoji}
+                <Image src={agentAvatars[selectedAgent]} alt={agent.name} width={32} height={32} className="w-full h-full object-cover" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -331,10 +341,10 @@ export default function AgentsPage() {
             >
               <div className="flex items-center gap-2.5 mb-2">
                 <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-base border"
+                  className="w-8 h-8 rounded-full overflow-hidden border"
                   style={{ borderColor: color, boxShadow: `0 0 10px ${color}33` }}
                 >
-                  {agent.emoji}
+                  <Image src={agentAvatars[selectedAgent]} alt={agent.name} width={32} height={32} className="w-full h-full object-cover" />
                 </div>
                 <div>
                   <span className="text-sm font-bold block" style={{ color }}>{agent.name}</span>
@@ -403,13 +413,13 @@ export default function AgentsPage() {
                     }`}
                   >
                     <div
-                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-sm sm:text-base border-2 transition-all"
+                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden border-2 transition-all"
                       style={{
                         borderColor: isSelected ? ac : 'transparent',
                         boxShadow: isSelected ? `0 0 12px ${ac}44` : 'none',
                       }}
                     >
-                      {agentInfo.emoji}
+                      <Image src={agentAvatars[id]} alt={agentInfo.name} width={36} height={36} className="w-full h-full object-cover" />
                     </div>
                     {isSelected && (
                       <span className="text-[7px] sm:text-[8px] font-mono font-bold uppercase tracking-widest" style={{ color: ac }}>
@@ -459,10 +469,10 @@ export default function AgentsPage() {
                   </p>
                   <div className="flex items-center gap-4">
                     <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center text-xl border-2"
+                      className="w-12 h-12 rounded-full overflow-hidden border-2"
                       style={{ borderColor: color, boxShadow: `0 0 16px ${color}33` }}
                     >
-                      {agent.emoji}
+                      <Image src={agentAvatars[selectedAgent]} alt={agent.name} width={48} height={48} className="w-full h-full object-cover" />
                     </div>
                     <div>
                       <h2 className="text-lg font-bold" style={{ color }}>

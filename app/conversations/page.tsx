@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { supabase, AGENTS, AgentId } from '@/lib/supabase';
 import { MessageSquare, Users, Clock, CheckCircle, XCircle, Loader2, Play } from 'lucide-react';
 
@@ -71,7 +72,7 @@ export default function ConversationsPage() {
     const found = Object.values(AGENTS).find(a => 
       a.name.toLowerCase() === name.toLowerCase()
     );
-    return found || { emoji: '🤖', color: '#888', name };
+    return found || { emoji: '🤖', avatar: '/agents/opus.png', color: '#888', name };
   };
 
   const getStatusInfo = (status: string) => {
@@ -170,13 +171,15 @@ export default function ConversationsPage() {
                           {conv.conversation_log?.slice(0, 4).map((m, i) => {
                             const agent = getAgentInfo(m.speaker);
                             return (
-                              <span 
-                                key={i} 
-                                className="text-sm"
+                              <Image
+                                key={i}
+                                src={agent.avatar}
+                                alt={m.speaker}
+                                width={20}
+                                height={20}
+                                className="w-5 h-5 rounded-full object-cover"
                                 title={m.speaker}
-                              >
-                                {agent.emoji}
-                              </span>
+                              />
                             );
                           })}
                           {(conv.conversation_log?.length || 0) > 4 && (
@@ -250,14 +253,14 @@ export default function ConversationsPage() {
                         className="flex gap-3 animate-fade-in"
                         style={{ animationDelay: `${i * 30}ms` }}
                       >
-                        <div 
-                          className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-xl border"
-                          style={{ 
+                        <div
+                          className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden border"
+                          style={{
                             backgroundColor: `${color}15`,
                             borderColor: `${color}40`
                           }}
                         >
-                          {agent.emoji}
+                          <Image src={agent.avatar} alt={agent.name} width={40} height={40} className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { ThumbsUp, Copy, ExternalLink, ArrowLeft, Rocket, Eye, FlaskConical, Package, Terminal } from 'lucide-react';
 import Link from 'next/link';
 
@@ -127,11 +128,11 @@ const ideas = [
 ];
 
 const radarActivity = [
-  { agent: 'USOPP', emoji: '\uD83D\uDEF0\uFE0F', message: "Décision : Oui, tester trois frameworks avec tracking d'engagement", time: 'il y a 4h' },
-  { agent: 'USOPP', emoji: '\uD83D\uDEF0\uFE0F', message: 'Retrospective Radar complétée', time: 'il y a 4h' },
-  { agent: 'STARK', emoji: '\u270D\uFE0F', message: "Les frameworks narratifs de Sarah sont notre voie à suivre, mais on fait encore du contenu réactif.", time: 'il y a 4h' },
-  { agent: 'CEO', emoji: '\uD83C\uDF4C', message: "Responsable : CEO. Première étape : assigner une tâche et une deadline aujourd'hui.", time: 'il y a 4h' },
-  { agent: 'KIRA', emoji: '\uD83E\uDDE0', message: "L'avance prédictive de 48h de MADARA sur les frameworks agents vaut la peine d'être mesurée.", time: 'il y a 4h' },
+  { agent: 'USOPP', avatar: '/agents/company-observer.png', message: "Décision : Oui, tester trois frameworks avec tracking d'engagement", time: 'il y a 4h' },
+  { agent: 'USOPP', avatar: '/agents/company-observer.png', message: 'Retrospective Radar complétée', time: 'il y a 4h' },
+  { agent: 'STARK', avatar: '/agents/creator.jpg', message: "Les frameworks narratifs de Sarah sont notre voie à suivre, mais on fait encore du contenu réactif.", time: 'il y a 4h' },
+  { agent: 'CEO', avatar: '/agents/opus.png', message: "Responsable : CEO. Première étape : assigner une tâche et une deadline aujourd'hui.", time: 'il y a 4h' },
+  { agent: 'KIRA', avatar: '/agents/brain.png', message: "L'avance prédictive de 48h de MADARA sur les frameworks agents vaut la peine d'être mesurée.", time: 'il y a 4h' },
 ];
 
 function AsciiProgressBar({ progress, width = 20 }: { progress: number; width?: number }) {
@@ -386,7 +387,7 @@ export default function RadarPage() {
               <div key={i} className="flex items-start gap-3 font-mono text-sm">
                 <span className="text-hacker-muted text-xs whitespace-nowrap">{activity.time}</span>
                 <span className="text-hacker-green">$</span>
-                <span className="text-lg leading-none">{activity.emoji}</span>
+                <Image src={activity.avatar} alt={activity.agent} width={20} height={20} className="w-5 h-5 rounded-full object-cover shrink-0" />
                 <div className="flex-1">
                   <span className="text-hacker-cyan">{activity.agent}</span>
                   <span className="text-hacker-muted"> : </span>

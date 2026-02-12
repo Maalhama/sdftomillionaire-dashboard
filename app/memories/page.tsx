@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { supabase, AGENTS, AgentId } from '@/lib/supabase';
 import { Brain, Filter, Clock, Tag, Sparkles } from 'lucide-react';
 
@@ -126,7 +127,7 @@ export default function MemoriesPage() {
                   boxShadow: isSelected ? `0 0 15px ${color}33` : undefined
                 }}
               >
-                <span className="text-2xl block mb-1">{agent.emoji}</span>
+                <Image src={agent.avatar} alt={agent.name} width={28} height={28} className="w-7 h-7 rounded-full object-cover mx-auto mb-0.5" />
                 <p className="text-2xl font-bold" style={{ color }}>{count}</p>
                 <p className="text-[10px] text-hacker-muted uppercase tracking-wider">{agent.name}</p>
               </button>
@@ -205,14 +206,14 @@ export default function MemoriesPage() {
                 >
                   <div className="flex items-start gap-4">
                     {/* Agent Avatar */}
-                    <div 
-                      className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-xl border"
-                      style={{ 
+                    <div
+                      className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden border"
+                      style={{
                         backgroundColor: `${color}15`,
                         borderColor: `${color}40`
                       }}
                     >
-                      {agent.emoji}
+                      <Image src={agent.avatar} alt={agent.name} width={40} height={40} className="w-full h-full object-cover" />
                     </div>
                     
                     {/* Content */}

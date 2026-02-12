@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { Pause, Play, Monitor, CheckSquare, MessageCircle, Brain, Zap, MessageSquare, Rocket, Terminal, Activity, Eye, Search, PenTool, Megaphone, BarChart3, RefreshCw } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { supabase, AGENTS, AgentId } from '@/lib/supabase';
@@ -33,6 +34,23 @@ interface AgentStats {
   experience_points: number;
   total_missions: number;
   successful_missions: number;
+}
+
+interface Roundtable {
+  id: string;
+  format: string;
+  topic: string;
+  participants: string[];
+  status: string;
+  turn_count: number;
+  conversation_log: Array<{
+    speaker: string;
+    dialogue?: string;
+    message?: string;
+    turn: number;
+    timestamp?: string;
+  }>;
+  created_at: string;
 }
 
 const agentColors: Record<string, string> = {
@@ -70,6 +88,7 @@ export default function StagePage() {
   const [cursorVisible, setCursorVisible] = useState(true);
   const [now, setNow] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeRoundtable, setActiveRoundtable] = useState<Roundtable | null>(null);
 
   const fetchData = useCallback(async () => {
     // Fetch recent events
@@ -103,6 +122,18 @@ export default function StagePage() {
       total: totalCount || 10
     });
 
+    // Fetch latest roundtable (running or most recent)
+    const { data: roundtableData } = await supabase
+      .from('ops_roundtable_queue')
+      .select('*')
+      .or('status.eq.running,status.eq.pending,status.eq.succeeded')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    
+    if (roundtableData && roundtableData[0]) {
+      setActiveRoundtable(roundtableData[0] as Roundtable);
+    }
+
     setLoading(false);
   }, []);
 
@@ -117,6 +148,14 @@ export default function StagePage() {
         { event: 'INSERT', schema: 'public', table: 'ops_agent_events' }, 
         (payload) => {
           setEvents(prev => [payload.new as Event, ...prev.slice(0, 29)]);
+        }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'ops_roundtable_queue' },
+        (payload) => {
+          if (payload.new) {
+            setActiveRoundtable(payload.new as Roundtable);
+          }
         }
       )
       .subscribe();
@@ -150,6 +189,7 @@ export default function StagePage() {
   const getAgentName = (agentId: string) => agentNameMap[agentId] || agentId.toUpperCase();
   const getAgentColor = (agentId: string) => agentColors[agentId] || '#00ff41';
   const getAgentEmoji = (agentId: string) => AGENTS[agentId as AgentId]?.emoji || '🤖';
+  const getAgentAvatar = (agentId: string) => AGENTS[agentId as AgentId]?.avatar || '/agents/opus.png';
 
   const getAgentStatus = (agentId: string) => {
     const recentEvent = events.find(e => e.agent_id === agentId);
@@ -244,6 +284,7 @@ export default function StagePage() {
       id,
       name: agentNameMap[id] || agent.name,
       emoji: agent.emoji,
+      avatar: agent.avatar,
       status,
       thought: lastEvent?.summary || lastEvent?.title || 'En attente...',
       level: stats?.level || 1,
@@ -461,6 +502,68 @@ export default function StagePage() {
           </div>
         </div>
       </div>
+
+      {/* Live Conversation Feed */}
+      {activeRoundtable && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-5">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="font-mono text-sm text-hacker-green">// live_conversation</span>
+            <span className={`badge ${activeRoundtable.status === 'running' ? 'badge-live' : 'badge-muted'} text-[10px]`}>
+              {activeRoundtable.status === 'running' ? '🔴 LIVE' : activeRoundtable.status.toUpperCase()}
+            </span>
+          </div>
+
+          <div className="terminal">
+            <div className="terminal-header">
+              <div className="terminal-dot red" />
+              <div className="terminal-dot yellow" />
+              <div className="terminal-dot green" />
+              <span className="ml-3 text-xs text-hacker-muted-light font-mono">
+                roundtable --format={activeRoundtable.format} --topic=&quot;{activeRoundtable.topic.slice(0, 40)}...&quot;
+              </span>
+            </div>
+
+            <div className="terminal-body p-4 max-h-[400px] overflow-y-auto">
+              <div className="mb-3 pb-2 border-b border-hacker-border">
+                <div className="font-mono text-sm text-hacker-amber mb-1">💬 {activeRoundtable.topic}</div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {activeRoundtable.participants.map((p) => (
+                    <span key={p} className="badge badge-muted" style={{ color: agentColors[p] || '#00ff41' }}>
+                      {agentNameMap[p] || p}
+                    </span>
+                  ))}
+                  <span className="text-hacker-muted ml-2">
+                    {activeRoundtable.turn_count}/{activeRoundtable.conversation_log?.length || 12} tours
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {activeRoundtable.conversation_log?.map((turn, idx) => {
+                  const speakerColor = agentColors[turn.speaker] || '#00ff41';
+                  const speakerName = agentNameMap[turn.speaker] || turn.speaker.toUpperCase();
+                  const message = turn.dialogue || turn.message || '';
+                  
+                  return (
+                    <div key={idx} className="font-mono text-xs">
+                      <span className="text-hacker-muted">[{idx + 1}]</span>{' '}
+                      <span style={{ color: speakerColor }} className="font-bold">{speakerName}:</span>{' '}
+                      <span className="text-hacker-text">{message}</span>
+                    </div>
+                  );
+                })}
+                
+                {activeRoundtable.status === 'running' && (
+                  <div className="font-mono text-xs text-hacker-green animate-pulse">
+                    <span className="text-hacker-muted">[{(activeRoundtable.conversation_log?.length || 0) + 1}]</span>{' '}
+                    ▋ en attente de réponse...
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Summary */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-5">
