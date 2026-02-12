@@ -6,15 +6,15 @@ import { Activity, Brain, Users, Zap, Trophy, TrendingUp } from 'lucide-react';
 
 interface AgentStats {
   agent_id: string;
-  xp: number;
+  experience_points: number;
   level: number;
-  missions_completed: number;
-  missions_failed: number;
-  conversations_participated: number;
-  current_streak: number;
-  best_streak: number;
-  skills: Record<string, { rank: number; xp: number }>;
-  achievements: string[];
+  total_missions: number;
+  successful_missions: number;
+  stat_wis: number;
+  stat_tru: number;
+  stat_spd: number;
+  stat_cre: number;
+  current_affect: string;
 }
 
 interface Relationship {
@@ -165,7 +165,7 @@ export default function AgentsPage() {
                   <div className="mt-2 flex items-center justify-center gap-2 text-[10px]">
                     <span className="text-hacker-purple">LV.{agentStat.level}</span>
                     <span className="text-hacker-muted">|</span>
-                    <span className="text-hacker-amber">{agentStat.xp} XP</span>
+                    <span className="text-hacker-amber">{agentStat.experience_points} XP</span>
                   </div>
                 )}
               </button>
@@ -240,48 +240,39 @@ export default function AgentsPage() {
                             LV.{stats.level}
                           </span>
                           <span className="text-hacker-amber font-mono text-sm">
-                            {stats.xp} XP
+                            {stats.experience_points} XP
                           </span>
                         </div>
                         <div className="font-mono text-xs">
                           <span className="text-hacker-muted">[</span>
-                          <span className="text-hacker-purple">{buildAsciiBar(stats.xp % 100)}</span>
+                          <span className="text-hacker-purple">{buildAsciiBar(stats.experience_points % 100)}</span>
                           <span className="text-hacker-muted">]</span>
-                          <span className="text-hacker-muted-light ml-2">{stats.xp % 100}%</span>
+                          <span className="text-hacker-muted-light ml-2">{stats.experience_points % 100}%</span>
                         </div>
                       </div>
 
                       {/* Quick Stats */}
                       <div className="grid grid-cols-3 gap-2 text-center font-mono text-xs">
                         <div className="card-terminal p-2">
-                          <div className="text-hacker-green font-bold">{stats.missions_completed || 0}</div>
-                          <div className="text-hacker-muted text-[10px]">Missions ✓</div>
+                          <div className="text-hacker-green font-bold">{stats.successful_missions || 0}/{stats.total_missions || 0}</div>
+                          <div className="text-hacker-muted text-[10px]">Missions</div>
                         </div>
                         <div className="card-terminal p-2">
-                          <div className="text-hacker-cyan font-bold">{stats.conversations_participated || 0}</div>
-                          <div className="text-hacker-muted text-[10px]">Convos</div>
+                          <div className="text-hacker-cyan font-bold">{stats.stat_wis || 50}</div>
+                          <div className="text-hacker-muted text-[10px]">WIS</div>
                         </div>
                         <div className="card-terminal p-2">
-                          <div className="text-hacker-amber font-bold">🔥 {stats.current_streak || 0}</div>
-                          <div className="text-hacker-muted text-[10px]">Streak</div>
+                          <div className="text-hacker-amber font-bold">{stats.stat_cre || 50}</div>
+                          <div className="text-hacker-muted text-[10px]">CRE</div>
                         </div>
                       </div>
 
-                      {/* Achievements */}
-                      {stats.achievements && stats.achievements.length > 0 && (
-                        <div className="mt-4">
-                          <p className="text-[10px] text-hacker-muted uppercase tracking-widest mb-2">
-                            <span className="text-hacker-amber">//</span> achievements
-                          </p>
-                          <div className="flex gap-1 flex-wrap">
-                            {stats.achievements.map((a, i) => (
-                              <span key={i} className="badge badge-amber text-[10px]">
-                                🏆 {a}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      {/* Current Affect */}
+                      <div className="mt-4 text-center">
+                        <span className="badge badge-muted text-[10px]">
+                          État: {stats.current_affect || 'neutral'}
+                        </span>
+                      </div>
                     </div>
                   )}
 

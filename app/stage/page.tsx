@@ -28,9 +28,9 @@ interface Event {
 interface AgentStats {
   agent_id: string;
   level: number;
-  xp: number;
-  current_streak: number;
-  missions_completed: number;
+  experience_points: number;
+  total_missions: number;
+  successful_missions: number;
 }
 
 const agentColors: Record<string, string> = {
@@ -245,7 +245,7 @@ export default function StagePage() {
       status,
       thought: lastEvent?.summary || lastEvent?.title || 'En attente...',
       level: stats?.level || 1,
-      xp: stats?.xp || 0,
+      xp: stats?.experience_points || 0,
     };
   });
 

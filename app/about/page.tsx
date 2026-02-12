@@ -7,10 +7,14 @@ import { supabase, AGENTS, AgentId } from '@/lib/supabase';
 interface AgentStats {
   agent_id: string;
   level: number;
-  xp: number;
-  missions_completed: number;
-  conversations_participated: number;
-  current_streak: number;
+  experience_points: number;
+  stat_wis: number;
+  stat_tru: number;
+  stat_spd: number;
+  stat_cre: number;
+  total_missions: number;
+  successful_missions: number;
+  current_affect: string;
 }
 
 interface AgentEvent {
@@ -183,12 +187,12 @@ export default function AboutPage() {
   const selectedRole = agentRoles[selectedAgentId];
   const color = agentColors[selectedAgentId] || '#00ff41';
 
-  // Calculate dynamic stats based on real data
+  // Use real stats from Supabase
   const dynamicStats = {
-    wis: Math.min(100, 50 + (selectedStats?.level || 1) * 10),
-    tru: Math.min(100, 60 + (selectedStats?.missions_completed || 0) * 2),
-    spd: Math.min(100, 40 + getAgentOpsCount(selectedAgentId) * 3),
-    cre: Math.min(100, 55 + (selectedStats?.conversations_participated || 0) * 5),
+    wis: selectedStats?.stat_wis || 50,
+    tru: selectedStats?.stat_tru || 50,
+    spd: selectedStats?.stat_spd || 50,
+    cre: selectedStats?.stat_cre || 50,
   };
 
   if (loading) {
@@ -281,7 +285,7 @@ export default function AboutPage() {
                   <div className="flex items-center gap-2 mt-2">
                     <span className="status-dot status-active" />
                     <span className="text-[11px] text-hacker-green uppercase tracking-widest">
-                      Actif — {selectedStats?.current_streak || 0} streak
+                      {selectedStats?.current_affect || 'neutral'} — {selectedStats?.successful_missions || 0}/{selectedStats?.total_missions || 0} missions
                     </span>
                   </div>
                 </div>
