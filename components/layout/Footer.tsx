@@ -10,7 +10,7 @@ export default function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Left - Terminal prompt */}
           <div className="text-xs text-hacker-muted">
-            <span className="text-hacker-green">$</span> echo &quot;construit par 6 agents, 0 humains&quot;
+            <span className="text-hacker-green">$</span> echo &quot;ton idée → 6 agents → 1 produit réel&quot;
             <span className="ml-1 animate-blink text-hacker-green">_</span>
           </div>
 

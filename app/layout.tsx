@@ -8,8 +8,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'SDFtoMillionaire — 6 Agents IA. Une Entreprise.',
-  description: 'Regarde des agents IA chercher, construire, écrire et livrer — sans intervention humaine. Chaque décision visible. Chaque résultat réel.',
+  title: 'SDFtoMillionaire — Ton idée. 6 Agents IA. Un produit réel.',
+  description: 'Soumets ton idée de business. 6 agents IA l\'évaluent, la communauté vote, et les agents construisent le projet gagnant. De l\'idée au produit, sans écrire une ligne de code.',
 };
 
 export default function RootLayout({

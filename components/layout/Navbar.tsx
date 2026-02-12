@@ -6,12 +6,11 @@ import { Terminal, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
 const navLinks = [
-  { href: '/#products', label: 'produits' },
+  { href: '/gallery', label: 'idées' },
   { href: '/radar', label: 'radar' },
-  { href: '/gallery', label: 'galerie' },
-  { href: '/insights', label: 'insights' },
   { href: '/agents', label: 'agents' },
   { href: '/stage', label: 'stage' },
+  { href: '/insights', label: 'insights' },
 ];
 
 export default function Navbar() {

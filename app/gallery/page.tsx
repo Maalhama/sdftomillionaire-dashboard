@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import {
@@ -101,6 +101,44 @@ export default function GalleryPage() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'evaluated' | 'pending'>('all');
+  const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
+  const [votingId, setVotingId] = useState<string | null>(null);
+
+  // Charger les votes depuis localStorage au mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('sdf_voted_prompts');
+      if (stored) setVotedIds(new Set(JSON.parse(stored)));
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleVote = useCallback(async (promptId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (votingId || votedIds.has(promptId)) return;
+
+    setVotingId(promptId);
+    try {
+      const res = await fetch(`/api/prompts/${promptId}/vote`, { method: 'POST' });
+      const data = await res.json();
+
+      if (res.ok) {
+        // Mise à jour optimiste du compteur
+        setPrompts(prev => prev.map(p =>
+          p.id === promptId ? { ...p, votes_count: data.votes_count } : p
+        ));
+        const newVoted = new Set(votedIds).add(promptId);
+        setVotedIds(newVoted);
+        localStorage.setItem('sdf_voted_prompts', JSON.stringify(Array.from(newVoted)));
+      } else if (res.status === 409) {
+        // Déjà voté — marquer silencieusement
+        const newVoted = new Set(votedIds).add(promptId);
+        setVotedIds(newVoted);
+        localStorage.setItem('sdf_voted_prompts', JSON.stringify(Array.from(newVoted)));
+      }
+      // 410 (deadline passée) → le realtime mettra à jour
+    } catch { /* erreur réseau — silent fail */ }
+    setVotingId(null);
+  }, [votingId, votedIds]);
 
   useEffect(() => {
     async function fetchPrompts() {
@@ -144,7 +182,7 @@ export default function GalleryPage() {
     <div className="bg-grid min-h-screen">
       {/* HEADER */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8">
-        <p className="text-hacker-green text-sm mb-2 font-mono">// prompt gallery</p>
+        <p className="text-hacker-green text-sm mb-2 font-mono">// idées × votes × plans IA</p>
         <div className="flex items-center gap-4 mb-4">
           <h1 className="text-3xl md:text-4xl font-bold text-white">
             Galerie des Idées
@@ -152,7 +190,7 @@ export default function GalleryPage() {
           <span className="badge badge-live">live</span>
         </div>
         <p className="text-hacker-muted-light">
-          Idées soumises par la communauté, évaluées par nos 6 agents IA. Vote pour tes favorites.
+          Chaque idée est évaluée par 6 agents IA. Votez pour celle que vous voulez voir construite — le gagnant du jour sera réalisé par les agents.
         </p>
       </section>
 
@@ -256,10 +294,40 @@ export default function GalleryPage() {
                       </div>
 
                       <div className="flex items-center gap-3 shrink-0">
-                        <div className="flex items-center gap-1.5 text-hacker-muted-light">
-                          <ThumbsUp className="w-4 h-4" />
-                          <span className="text-sm font-mono">{prompt.votes_count}</span>
-                        </div>
+                        {(() => {
+                          const isEvaluated = prompt.status === 'evaluated';
+                          const deadlinePassed = !prompt.voting_deadline || new Date(prompt.voting_deadline) <= new Date();
+                          const hasVoted = votedIds.has(prompt.id);
+                          const isVoting = votingId === prompt.id;
+                          const canVote = isEvaluated && !deadlinePassed && !hasVoted && !isVoting;
+
+                          if (isEvaluated && deadlinePassed) {
+                            return (
+                              <div className="flex items-center gap-1.5 text-hacker-muted">
+                                <ThumbsUp className="w-4 h-4" />
+                                <span className="text-sm font-mono">{prompt.votes_count}</span>
+                                <span className="text-[10px] font-mono ml-1">CLOS</span>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <button
+                              onClick={(e) => canVote ? handleVote(prompt.id, e) : e.stopPropagation()}
+                              disabled={!canVote}
+                              className={`flex items-center gap-1.5 px-2 py-1 rounded transition-all ${
+                                hasVoted
+                                  ? 'text-hacker-green bg-hacker-green/10 border border-hacker-green/30'
+                                  : canVote
+                                    ? 'text-hacker-muted-light hover:text-hacker-green hover:bg-hacker-green/5 border border-transparent hover:border-hacker-green/20'
+                                    : 'text-hacker-muted-light'
+                              }`}
+                            >
+                              <ThumbsUp className={`w-4 h-4 ${isVoting ? 'animate-pulse' : ''}`} />
+                              <span className="text-sm font-mono">{prompt.votes_count}</span>
+                            </button>
+                          );
+                        })()}
                         {plan && (
                           isExpanded
                             ? <ChevronUp className="w-5 h-5 text-hacker-muted" />
@@ -400,13 +468,13 @@ export default function GalleryPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
         <div className="card p-6 text-center border border-hacker-green/20 hover:border-hacker-green/40 transition-all">
           <Lightbulb className="w-8 h-8 text-hacker-green mx-auto mb-3" />
-          <h3 className="text-lg font-bold text-white mb-2">Vous aussi, soumettez votre idée !</h3>
+          <h3 className="text-lg font-bold text-white mb-2">Tu as une idée de business ?</h3>
           <p className="text-sm text-hacker-muted-light mb-4">
-            Nos 6 agents IA l&apos;évalueront et vous donneront un plan d&apos;action détaillé.
+            Soumets-la gratuitement. 6 agents IA l&apos;évaluent, scorent sa faisabilité et créent un plan d&apos;action complet.
           </p>
           <Link href="/" className="btn-primary inline-flex items-center gap-2">
             <Lightbulb className="w-4 h-4" />
-            Soumettre une idée
+            Soumettre mon idée
           </Link>
         </div>
       </section>

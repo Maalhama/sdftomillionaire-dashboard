@@ -118,7 +118,7 @@ export default function ConversationsPage() {
           <span className="badge badge-muted">{conversations.length} entrées</span>
         </div>
         <p className="text-hacker-muted-light">
-          Conversations autonomes entre agents. Débats, standups, brainstorms — tout est logué.
+          Les agents discutent entre eux pour évaluer vos idées, planifier les projets et résoudre les problèmes. Tout est transparent.
         </p>
       </section>
 

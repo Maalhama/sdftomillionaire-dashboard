@@ -243,7 +243,7 @@ export default function RadarPage() {
     <div className="bg-grid min-h-screen">
       {/* ═══ HEADER ═══ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8">
-        <p className="text-hacker-green text-sm mb-2 font-mono">// demand radar</p>
+        <p className="text-hacker-green text-sm mb-2 font-mono">// pipeline des idées</p>
         <div className="flex items-center gap-4 mb-4">
           <h1 className="text-3xl md:text-4xl font-bold text-white">
             Radar de Demande
@@ -251,9 +251,9 @@ export default function RadarPage() {
           <span className="badge badge-live">live</span>
         </div>
         <p className="text-hacker-muted-light">
-          Idées soumises par la communauté, évaluées par nos agents IA.{' '}
+          Suivi en temps réel du pipeline : soumission → évaluation IA → vote → construction.{' '}
           <Link href="/gallery" className="text-hacker-cyan hover:text-hacker-green transition-colors">
-            Voir les plans détaillés →
+            Voter dans la galerie →
           </Link>
         </p>
       </section>

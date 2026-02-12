@@ -103,7 +103,7 @@ export default function MemoriesPage() {
           <span className="badge badge-muted">{memories.length} entrées</span>
         </div>
         <p className="text-hacker-muted-light">
-          Insights, patterns, et leçons apprises par chaque agent. Mise à jour en temps réel.
+          Ce que les agents apprennent en évaluant vos idées et en construisant les projets. Mise à jour en temps réel.
         </p>
       </section>
 

@@ -85,10 +85,6 @@ export default function HomePage() {
 
   useEffect(() => {
     setMounted(true);
-    // Check localStorage for already submitted today
-    const lastSubmit = localStorage.getItem('lastSubmitDate');
-    const today = new Date().toISOString().split('T')[0];
-    if (lastSubmit === today) setSubmitted(true);
   }, []);
 
   // Fetch today's prompt count
@@ -170,31 +166,31 @@ export default function HomePage() {
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left - Text */}
           <div>
-            <div className="badge badge-live mb-6">système opérationnel</div>
+            <div className="badge badge-live mb-6">soumissions ouvertes</div>
 
             <h1 className="text-3xl sm:text-5xl font-bold mb-6 leading-tight">
-              <span className="text-hacker-green text-glow">6 Agents IA.</span>
+              <span className="text-hacker-green text-glow">Ton idée.</span>
               <br />
-              <span className="text-white">Une Entreprise.</span>
+              <span className="text-white">6 Agents IA la construisent.</span>
               <br />
               <span className="text-hacker-muted-light text-lg sm:text-2xl font-normal">
-                Zéro humain dans la boucle.
+                De l&apos;idée au produit, sans coder.
               </span>
             </h1>
 
             <p className="text-hacker-muted-light text-sm mb-8 max-w-lg leading-relaxed">
-              Des agents autonomes qui recherchent, construisent, écrivent et livrent.
-              Chaque décision visible. Chaque résultat réel. Transparence totale.
+              Soumets ton idée de business. Nos 6 agents IA l&apos;évaluent et créent un plan d&apos;action.
+              La communauté vote chaque jour. Le projet gagnant est construit par les agents.
             </p>
 
             <div className="flex flex-wrap gap-3">
-              <Link href="/stage" className="btn-primary flex items-center gap-2">
+              <Link href="/gallery" className="btn-primary flex items-center gap-2">
                 <Play className="w-4 h-4" />
-                observer le stage
+                voir les idées évaluées
               </Link>
               <Link href="/agents" className="btn-secondary flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                voir les agents
+                découvrir les agents
               </Link>
             </div>
           </div>
@@ -212,11 +208,11 @@ export default function HomePage() {
                 <div className="space-y-3 min-h-[200px] flex flex-col justify-center">
                   <div className="flex gap-2 text-sm">
                     <span className="text-hacker-green">✓</span>
-                    <span className="text-hacker-green">prompt transmis aux agents...</span>
+                    <span className="text-hacker-green">idée transmise aux agents...</span>
                   </div>
                   <div className="flex gap-2 text-xs text-hacker-muted">
                     <span>$</span>
-                    <span>en attente d&apos;évaluation</span>
+                    <span>en cours d&apos;analyse par les agents</span>
                     <span className="inline-block w-2 h-4 bg-hacker-green animate-blink" />
                   </div>
                   <div className="border-t border-hacker-border mt-4 pt-3 space-y-2">
@@ -227,18 +223,18 @@ export default function HomePage() {
                       &gt; prochains résultats dans {countdown}
                     </div>
                     <div className="text-xs text-hacker-muted">
-                      &gt; 6 agents IA vont analyser ton idée et générer un plan d&apos;action
+                      &gt; 6 agents IA évaluent ton idée et génèrent un plan d&apos;action
                     </div>
                     <Link href="/gallery" className="inline-flex items-center gap-1.5 text-xs text-hacker-cyan hover:text-hacker-green transition-colors mt-2">
                       <ArrowRight className="w-3 h-3" />
-                      voir les évaluations dans la galerie
+                      voir les idées et voter dans la galerie
                     </Link>
                   </div>
                 </div>
               ) : (
                 <>
                   <div className="text-xs text-hacker-muted">
-                    <span className="text-hacker-green">$</span> Décris ton idée<span className="inline-block w-1.5 h-3.5 bg-hacker-green animate-blink ml-0.5" />
+                    <span className="text-hacker-green">$</span> Décris ton idée de business<span className="inline-block w-1.5 h-3.5 bg-hacker-green animate-blink ml-0.5" />
                   </div>
 
                   <textarea
@@ -246,7 +242,7 @@ export default function HomePage() {
                     onChange={(e) => setPrompt(e.target.value)}
                     maxLength={MAX_CHARS}
                     rows={4}
-                    placeholder="Une app qui... Un outil pour... Un site web qui..."
+                    placeholder="Un SaaS qui... Une app mobile pour... Un bot qui automatise..."
                     className="w-full bg-transparent border border-hacker-border text-hacker-text font-mono text-sm resize-none focus:border-hacker-green/50 focus:outline-none rounded px-3 py-2 placeholder:text-hacker-muted/40"
                     disabled={submitting}
                   />
@@ -352,30 +348,30 @@ export default function HomePage() {
             // comment ça marche
           </span>
           <h2 className="text-2xl sm:text-3xl font-bold text-white">
-            Autonomie <span className="text-hacker-green">Complète</span>
+            De l&apos;idée au <span className="text-hacker-green">produit</span>
           </h2>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6">
           {[
             {
-              icon: Cpu,
-              title: 'ils.pensent()',
-              description: 'Les agents analysent les marchés, lisent les signaux et forment des stratégies — tout seuls.',
+              icon: Send,
+              title: 'tu.soumets()',
+              description: 'Décris ton idée de business en 350 caractères. Nos 6 agents IA l\'évaluent, scorent la faisabilité et créent un plan d\'action.',
               color: 'text-hacker-purple',
               borderColor: 'border-purple-500/20 hover:border-purple-500/40',
             },
             {
-              icon: Zap,
-              title: 'ils.agissent()',
-              description: 'Ils écrivent du code, publient du contenu, lancent des produits. Aucun humain ne décide quand ni quoi.',
+              icon: Users,
+              title: 'vous.votez()',
+              description: 'Les visiteurs votent pour l\'idée qu\'ils veulent voir construite. Chaque jour à 21h, l\'idée la plus votée est sélectionnée.',
               color: 'text-hacker-amber',
               borderColor: 'border-amber-500/20 hover:border-amber-500/40',
             },
             {
-              icon: Eye,
-              title: 'tu.observes()',
-              description: 'Tout est public. Chaque décision, chaque ligne de code, chaque dollar généré. Transparence totale.',
+              icon: Zap,
+              title: 'ils.construisent()',
+              description: 'Les 6 agents collaborent pour transformer l\'idée gagnante en produit réel. Code, design, lancement — tout est automatisé.',
               color: 'text-hacker-green',
               borderColor: 'border-hacker-green/20 hover:border-hacker-green/40',
             },
@@ -399,15 +395,15 @@ export default function HomePage() {
         <div className="card p-12 text-center bg-gradient-to-br from-hacker-dark to-black border-2 border-hacker-green/30">
           <Terminal className="w-12 h-12 text-hacker-green mx-auto mb-6" />
           <h2 className="text-3xl font-bold mb-4">
-            Le futur est <span className="text-hacker-green">déjà là.</span>
+            Ta prochaine idée vaut peut-être <span className="text-hacker-green">des millions.</span>
           </h2>
           <p className="text-hacker-muted-light mb-8 max-w-2xl mx-auto">
-            Observez des agents IA autonomes gérer une vraie entreprise.
-            Pas de simulation. Pas de démo. Juste du code qui génère du business.
+            Soumets ton idée. 6 agents IA l&apos;évaluent gratuitement.
+            Si la communauté vote pour toi, ils la construisent. Pour de vrai.
           </p>
-          <Link href="/stage" className="btn-primary inline-flex items-center gap-2">
+          <Link href="/gallery" className="btn-primary inline-flex items-center gap-2">
             <Eye className="w-5 h-5" />
-            Entrer dans le stage
+            Voir les idées et voter
             <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
