@@ -21,9 +21,11 @@ interface AgentStats {
   level: number;
   total_missions: number;
   successful_missions: number;
-  stat_wis: number;
-  stat_tru: number;
+  stat_vrl: number;
   stat_spd: number;
+  stat_rch: number;
+  stat_tru: number;
+  stat_wis: number;
   stat_cre: number;
   current_affect: string;
 }
@@ -35,6 +37,17 @@ interface AgentEvent {
   title: string;
   summary: string;
   created_at: string;
+}
+
+interface AgentRelationship {
+  id: string;
+  agent_a: string;
+  agent_b: string;
+  affinity: number;
+  total_interactions: number;
+  positive_interactions: number;
+  negative_interactions: number;
+  last_interaction_at: string;
 }
 
 // ═══ STATIC DATA ═══
@@ -176,6 +189,7 @@ export default function AgentsPage() {
   const [selectedAgent, setSelectedAgent] = useState<AgentId>('opus');
   const [allStats, setAllStats] = useState<AgentStats[]>([]);
   const [recentEvents, setRecentEvents] = useState<AgentEvent[]>([]);
+  const [relationships, setRelationships] = useState<AgentRelationship[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -195,12 +209,14 @@ export default function AgentsPage() {
   }, []);
 
   async function fetchData() {
-    const [{ data: stats }, { data: events }] = await Promise.all([
+    const [{ data: stats }, { data: events }, { data: rels }] = await Promise.all([
       supabase.from('ops_agent_stats').select('*'),
       supabase.from('ops_agent_events').select('*').order('created_at', { ascending: false }).limit(50),
+      supabase.from('ops_agent_relationships').select('*'),
     ]);
     setAllStats(stats || []);
     setRecentEvents(events || []);
+    setRelationships(rels || []);
     setLoading(false);
   }
 
@@ -211,10 +227,22 @@ export default function AgentsPage() {
   const lastEvent = recentEvents.find(e => e.agent_id === selectedAgent) || null;
   const opsCount = recentEvents.filter(e => e.agent_id === selectedAgent).length;
 
+  // Get relationships for selected agent
+  const agentRelationships = relationships
+    .filter(r => r.agent_a === selectedAgent || r.agent_b === selectedAgent)
+    .map(r => {
+      const otherId = r.agent_a === selectedAgent ? r.agent_b : r.agent_a;
+      const otherAgent = AGENTS[otherId as AgentId];
+      return { ...r, otherId, otherName: otherAgent?.name || otherId, otherColor: agentColors[otherId] || '#888' };
+    })
+    .sort((a, b) => b.affinity - a.affinity);
+
   const dynamicStats = {
-    wis: stats?.stat_wis || 50,
-    tru: stats?.stat_tru || 50,
+    vrl: stats?.stat_vrl || 50,
     spd: stats?.stat_spd || 50,
+    rch: stats?.stat_rch || 50,
+    tru: stats?.stat_tru || 50,
+    wis: stats?.stat_wis || 50,
     cre: stats?.stat_cre || 50,
   };
 
@@ -367,9 +395,11 @@ export default function AgentsPage() {
               </div>
               <div className="space-y-1 text-[10px] mb-3">
                 {([
-                  { key: 'stat_wis', label: 'WIS' },
-                  { key: 'stat_tru', label: 'TRU' },
+                  { key: 'stat_vrl', label: 'VRL' },
                   { key: 'stat_spd', label: 'SPD' },
+                  { key: 'stat_rch', label: 'RCH' },
+                  { key: 'stat_tru', label: 'TRU' },
+                  { key: 'stat_wis', label: 'WIS' },
                   { key: 'stat_cre', label: 'CRE' },
                 ] as const).map((s) => {
                   const val = stats?.[s.key] || 50;
@@ -513,9 +543,11 @@ export default function AgentsPage() {
                   </p>
                   <div className="space-y-2 font-mono text-xs">
                     {([
-                      { key: 'wis' as const, label: 'WIS' },
-                      { key: 'tru' as const, label: 'TRU' },
+                      { key: 'vrl' as const, label: 'VRL' },
                       { key: 'spd' as const, label: 'SPD' },
+                      { key: 'rch' as const, label: 'RCH' },
+                      { key: 'tru' as const, label: 'TRU' },
+                      { key: 'wis' as const, label: 'WIS' },
                       { key: 'cre' as const, label: 'CRE' },
                     ]).map((s) => {
                       const val = dynamicStats[s.key];
@@ -625,6 +657,73 @@ export default function AgentsPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Agent Relationships ── */}
+      {agentRelationships.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
+          <div className="terminal">
+            <div className="terminal-header">
+              <div className="terminal-dot red" />
+              <div className="terminal-dot yellow" />
+              <div className="terminal-dot green" />
+              <span className="ml-3 text-xs text-hacker-muted-light font-mono">
+                sdf@hq ~ cat /relationships/{selectedAgent}.json
+              </span>
+            </div>
+            <div className="p-5">
+              <p className="text-[10px] text-hacker-muted uppercase tracking-widest mb-4">
+                <span className="text-hacker-green">//</span> affinités avec les autres agents
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {agentRelationships.map((rel) => {
+                  const affinityPct = Math.round(rel.affinity * 100);
+                  const affinityColor = affinityPct >= 70 ? '#22c55e' : affinityPct >= 50 ? '#f59e0b' : '#ef4444';
+                  return (
+                    <div
+                      key={rel.id}
+                      className="flex items-center gap-3 p-3 rounded border border-hacker-border"
+                      style={{ borderColor: `${rel.otherColor}20` }}
+                    >
+                      <Image
+                        src={agentAvatars[rel.otherId] || '/agents/opus.png'}
+                        alt={rel.otherName}
+                        width={28}
+                        height={28}
+                        className="w-7 h-7 rounded-full object-cover border"
+                        style={{ borderColor: rel.otherColor }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-bold font-mono" style={{ color: rel.otherColor }}>
+                            {rel.otherName}
+                          </span>
+                          <span className="text-[10px] font-mono font-bold" style={{ color: affinityColor }}>
+                            {affinityPct}%
+                          </span>
+                        </div>
+                        <div className="h-1.5 bg-hacker-border rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${affinityPct}%`, backgroundColor: affinityColor }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-[9px] text-hacker-muted font-mono">
+                            {rel.total_interactions} interactions
+                          </span>
+                          <span className="text-[9px] font-mono" style={{ color: '#22c55e' }}>
+                            +{rel.positive_interactions}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Feature Cards ── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

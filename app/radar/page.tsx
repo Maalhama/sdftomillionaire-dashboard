@@ -1,9 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { ThumbsUp, Copy, ExternalLink, ArrowLeft, Rocket, Eye, FlaskConical, Package, Terminal } from 'lucide-react';
+import { ThumbsUp, Copy, ExternalLink, ArrowLeft, Rocket, Eye, FlaskConical, Package, Terminal, DollarSign, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
+import { supabase, AGENTS } from '@/lib/supabase';
+
+interface RevenueEntry {
+  id: string;
+  amount: number;
+  currency: string;
+  source: string;
+  description: string;
+  attributed_agent: string;
+  created_at: string;
+}
+
+const sourceColors: Record<string, string> = {
+  polymarket: '#f59e0b',
+  freelance: '#8b5cf6',
+  saas: '#22c55e',
+  content: '#ec4899',
+  other: '#3b82f6',
+};
 
 const pipelineStats = [
   { label: 'Surveillance', count: 70, sub: 'Idées suivies', icon: Eye },
@@ -150,6 +169,33 @@ function AsciiProgressBar({ progress, width = 20 }: { progress: number; width?: 
 export default function RadarPage() {
   const [filter, setFilter] = useState('all');
   const [votedIds, setVotedIds] = useState<number[]>([]);
+  const [revenue, setRevenue] = useState<RevenueEntry[]>([]);
+  const [revenueTotal, setRevenueTotal] = useState(0);
+
+  useEffect(() => {
+    async function fetchRevenue() {
+      const { data } = await supabase
+        .from('ops_revenue')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (data) {
+        setRevenue(data);
+        setRevenueTotal(data.reduce((sum, r) => sum + Number(r.amount), 0));
+      }
+    }
+    fetchRevenue();
+
+    const channel = supabase
+      .channel('revenue-updates')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ops_revenue' }, (payload) => {
+        setRevenue(prev => [payload.new as RevenueEntry, ...prev.slice(0, 19)]);
+        setRevenueTotal(prev => prev + Number((payload.new as RevenueEntry).amount));
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const handleVote = (id: number) => {
     if (!votedIds.includes(id)) {
@@ -399,6 +445,64 @@ export default function RadarPage() {
               <span className="text-hacker-green">$</span>
               <span className="text-hacker-muted cursor-blink">_</span>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ REVENUE TRACKER ═══ */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <DollarSign className="w-5 h-5 text-hacker-green" />
+            <h2 className="text-xl font-bold text-white">Revenus</h2>
+            <span className="badge badge-live">LIVE</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-hacker-green" />
+            <span className="text-lg font-bold text-hacker-green font-mono">
+              {revenueTotal.toFixed(2)}€
+            </span>
+          </div>
+        </div>
+
+        <div className="terminal">
+          <div className="terminal-header">
+            <div className="terminal-dot red" />
+            <div className="terminal-dot yellow" />
+            <div className="terminal-dot green" />
+            <span className="text-xs text-hacker-muted-light ml-2 font-mono">ops_revenue.log</span>
+          </div>
+          <div className="terminal-body space-y-2">
+            {revenue.length === 0 ? (
+              <p className="text-hacker-muted text-sm font-mono text-center py-6">
+                // aucun revenu enregistré
+              </p>
+            ) : (
+              revenue.map((r) => {
+                const agentInfo = r.attributed_agent ? AGENTS[r.attributed_agent as keyof typeof AGENTS] : null;
+                const srcColor = sourceColors[r.source] || '#888';
+                return (
+                  <div key={r.id} className="flex items-center gap-3 font-mono text-sm">
+                    <span className="text-hacker-muted text-xs whitespace-nowrap">
+                      {new Date(r.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                    </span>
+                    <span className="text-hacker-green font-bold whitespace-nowrap">
+                      +{Number(r.amount).toFixed(2)}€
+                    </span>
+                    <span
+                      className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border"
+                      style={{ color: srcColor, borderColor: `${srcColor}40`, backgroundColor: `${srcColor}10` }}
+                    >
+                      {r.source}
+                    </span>
+                    {agentInfo && (
+                      <Image src={agentInfo.avatar} alt={agentInfo.name} width={16} height={16} className="w-4 h-4 rounded-full object-cover" />
+                    )}
+                    <span className="text-hacker-text text-xs truncate flex-1">{r.description}</span>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </section>
