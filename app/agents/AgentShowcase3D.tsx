@@ -1,21 +1,25 @@
 'use client';
 
-import { Suspense, useRef, useMemo, useState, useEffect, useCallback } from 'react';
+import { Suspense, useRef, useMemo, useState, useEffect, useCallback, Component, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Grid, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
 useGLTF.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 
-// ═══ WEBGL DETECTION ═══
+// ═══ ERROR BOUNDARY ═══
 
-function detectWebGL(): boolean {
-  try {
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-    return !!gl;
-  } catch {
-    return false;
+class Showcase3DErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode; fallback: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) return this.props.fallback;
+    return this.props.children;
   }
 }
 
@@ -396,12 +400,8 @@ interface AgentShowcase3DProps {
 }
 
 export default function AgentShowcase3D({ modelPath, agentColor, agentName }: AgentShowcase3DProps) {
-  const [webglSupported, setWebglSupported] = useState<boolean | null>(null);
   const controlsRef = useRef<any>(null);
-
-  useEffect(() => {
-    setWebglSupported(detectWebGL());
-  }, []);
+  const [error, setError] = useState(false);
 
   const handleResetCamera = useCallback(() => {
     if (typeof window !== 'undefined' && (window as any).__resetShowcaseCamera) {
@@ -409,24 +409,22 @@ export default function AgentShowcase3D({ modelPath, agentColor, agentName }: Ag
     }
   }, []);
 
-  if (webglSupported === null) {
-    return <LoadingSpinner />;
-  }
-
-  if (!webglSupported) {
+  if (error) {
     return <NoWebGLFallback agentName={agentName} />;
   }
 
   return (
+    <Showcase3DErrorBoundary fallback={<NoWebGLFallback agentName={agentName} />}>
     <div className="w-full h-full relative">
       <Suspense fallback={<LoadingSpinner />}>
         <Canvas
           camera={{ position: DEFAULT_CAM_POS, fov: DEFAULT_CAM_FOV }}
-          gl={{ antialias: true, alpha: true }}
+          gl={{ antialias: true, alpha: true, failIfMajorPerformanceCaveat: false }}
           style={{ background: 'transparent' }}
           onCreated={(state) => {
             state.gl.setClearColor('#040404', 1);
           }}
+          onError={() => setError(true)}
         >
           {/* Global lighting */}
           <ambientLight intensity={0.4} />
@@ -488,5 +486,6 @@ export default function AgentShowcase3D({ modelPath, agentColor, agentName }: Ag
         // {agentName.toLowerCase()}_3d_model
       </div>
     </div>
+    </Showcase3DErrorBoundary>
   );
 }
