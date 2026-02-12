@@ -332,13 +332,12 @@ export default function AgentsPage() {
               />
             </div>
 
-            <div className="absolute top-3 right-4 text-right pointer-events-none">
-              <pre className="text-hacker-green text-[6px] leading-tight opacity-50 font-mono">{ASCII_LOGO}</pre>
-              <p className="text-[10px] text-hacker-green/70 font-mono font-bold uppercase tracking-[0.25em] mt-1">
+            <div className="absolute top-3 right-4 pointer-events-none">
+              <pre className="text-hacker-green text-xs leading-tight opacity-40 font-mono whitespace-pre">
+{ASCII_LOGO}
+              </pre>
+              <p className="text-[9px] text-hacker-green/50 font-mono font-bold uppercase tracking-[0.3em] text-center mt-1">
                 TO MILLIONAIRE
-              </p>
-              <p className="text-[8px] text-hacker-muted font-mono uppercase tracking-widest mt-0.5">
-                Unité: {agent.name}
               </p>
             </div>
 
