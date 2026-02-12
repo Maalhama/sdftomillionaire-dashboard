@@ -2,7 +2,7 @@
 
 import { Suspense, useRef, useMemo, useState, useCallback, useEffect, Component, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Grid, useGLTF } from '@react-three/drei';
+import { Grid, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 
 useGLTF.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
@@ -27,7 +27,6 @@ class Showcase3DErrorBoundary extends Component<{ children: ReactNode; fallback:
 
 const NEON_GREEN = '#00ff41';
 const GRID_SIZE = 20;
-const PARTICLE_COUNT = 300;
 
 // ═══ SHOWCASE MODEL ═══
 
@@ -115,114 +114,116 @@ function MatrixFloor() {
   );
 }
 
-// ═══ MATRIX RAIN PARTICLES ═══
+// ═══ MATRIX DIGITAL RAIN (columns of falling digits) ═══
 
-function MatrixRain() {
-  const pointsRef = useRef<THREE.Points>(null);
+const MATRIX_CHARS = '0123456789';
+const COLUMN_COUNT = 24;
+const CHARS_PER_COLUMN = 28;
+const CHAR_SIZE = 0.35;
 
-  const { positions, speeds, phases } = useMemo(() => {
-    const pos = new Float32Array(PARTICLE_COUNT * 3);
-    const spd = new Float32Array(PARTICLE_COUNT);
-    const phs = new Float32Array(PARTICLE_COUNT);
+function MatrixDigitalRain() {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const textureRef = useRef<THREE.CanvasTexture | null>(null);
+  const columnsRef = useRef<{ offset: number; speed: number; chars: string[] }[]>([]);
 
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const i3 = i * 3;
-      // Spread particles in a wide area around center
-      pos[i3] = (Math.random() - 0.5) * GRID_SIZE;       // x
-      pos[i3 + 1] = Math.random() * 12;                   // y (0 to 12 height)
-      pos[i3 + 2] = (Math.random() - 0.5) * GRID_SIZE;   // z
-      spd[i] = 1.5 + Math.random() * 3;                   // fall speed
-      phs[i] = Math.random() * Math.PI * 2;               // phase for brightness flicker
+  const { canvas, texture } = useMemo(() => {
+    const W = 512;
+    const H = 1024;
+    const cvs = document.createElement('canvas');
+    cvs.width = W;
+    cvs.height = H;
+    const ctx = cvs.getContext('2d')!;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, W, H);
+
+    const tex = new THREE.CanvasTexture(cvs);
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+
+    // Init columns
+    const cols: { offset: number; speed: number; chars: string[] }[] = [];
+    for (let c = 0; c < COLUMN_COUNT; c++) {
+      const chars: string[] = [];
+      for (let r = 0; r < CHARS_PER_COLUMN; r++) {
+        chars.push(MATRIX_CHARS[Math.floor(Math.random() * MATRIX_CHARS.length)]);
+      }
+      cols.push({
+        offset: Math.random() * CHARS_PER_COLUMN,
+        speed: 0.8 + Math.random() * 1.5,
+        chars,
+      });
     }
+    columnsRef.current = cols;
+    canvasRef.current = cvs;
+    textureRef.current = tex;
 
-    return { positions: pos, speeds: spd, phases: phs };
+    return { canvas: cvs, texture: tex };
   }, []);
 
   useFrame((state) => {
-    if (!pointsRef.current) return;
-    const posArray = pointsRef.current.geometry.attributes.position.array as Float32Array;
-    const t = state.clock.elapsedTime;
+    if (!canvasRef.current || !textureRef.current) return;
+    const ctx = canvasRef.current.getContext('2d')!;
+    const W = canvasRef.current.width;
+    const H = canvasRef.current.height;
+    const dt = 0.016;
 
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const i3 = i * 3;
-      // Fall down
-      posArray[i3 + 1] -= speeds[i] * 0.016; // ~60fps delta
+    // Fade background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
+    ctx.fillRect(0, 0, W, H);
 
-      // Reset to top when hitting ground
-      if (posArray[i3 + 1] < 0) {
-        posArray[i3] = (Math.random() - 0.5) * GRID_SIZE;
-        posArray[i3 + 1] = 8 + Math.random() * 4;
-        posArray[i3 + 2] = (Math.random() - 0.5) * GRID_SIZE;
+    const colWidth = W / COLUMN_COUNT;
+    const rowHeight = H / CHARS_PER_COLUMN;
+    ctx.font = `bold ${Math.floor(rowHeight * 0.75)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (let c = 0; c < COLUMN_COUNT; c++) {
+      const col = columnsRef.current[c];
+      col.offset += col.speed * dt;
+
+      // Randomly change a character
+      if (Math.random() < 0.08) {
+        const ri = Math.floor(Math.random() * CHARS_PER_COLUMN);
+        col.chars[ri] = MATRIX_CHARS[Math.floor(Math.random() * MATRIX_CHARS.length)];
+      }
+
+      const headRow = Math.floor(col.offset) % CHARS_PER_COLUMN;
+      const x = colWidth * c + colWidth / 2;
+
+      for (let r = 0; r < CHARS_PER_COLUMN; r++) {
+        const y = rowHeight * r + rowHeight / 2;
+        const dist = (headRow - r + CHARS_PER_COLUMN) % CHARS_PER_COLUMN;
+
+        if (dist === 0) {
+          // Head character — bright white-green
+          ctx.fillStyle = '#ffffff';
+          ctx.globalAlpha = 1;
+        } else if (dist < 6) {
+          // Trail — bright green fading
+          ctx.fillStyle = NEON_GREEN;
+          ctx.globalAlpha = 1 - dist * 0.12;
+        } else if (dist < 16) {
+          // Mid trail — darker green
+          ctx.fillStyle = '#00aa30';
+          ctx.globalAlpha = 0.5 - (dist - 6) * 0.04;
+        } else {
+          continue; // Skip far chars (already faded by background)
+        }
+
+        ctx.fillText(col.chars[r], x, y);
       }
     }
+    ctx.globalAlpha = 1;
 
-    pointsRef.current.geometry.attributes.position.needsUpdate = true;
-
-    // Subtle flicker on the material
-    const mat = pointsRef.current.material as THREE.PointsMaterial;
-    mat.opacity = 0.5 + Math.sin(t * 2) * 0.1;
+    textureRef.current.needsUpdate = true;
   });
 
   return (
-    <points ref={pointsRef}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={PARTICLE_COUNT}
-          array={positions}
-          itemSize={3}
-        />
-      </bufferGeometry>
-      <pointsMaterial
-        color={NEON_GREEN}
-        size={0.06}
-        transparent
-        opacity={0.6}
-        sizeAttenuation
-        depthWrite={false}
-      />
-    </points>
-  );
-}
-
-// Taller vertical "streams" — thin green lines falling like Matrix code columns
-function MatrixStreams() {
-  const STREAM_COUNT = 40;
-  const groupRef = useRef<THREE.Group>(null);
-
-  const streams = useMemo(() => {
-    return Array.from({ length: STREAM_COUNT }, () => ({
-      x: (Math.random() - 0.5) * GRID_SIZE,
-      z: (Math.random() - 0.5) * GRID_SIZE,
-      y: Math.random() * 10,
-      speed: 2 + Math.random() * 4,
-      height: 0.3 + Math.random() * 1.5,
-      opacity: 0.1 + Math.random() * 0.25,
-    }));
-  }, []);
-
-  useFrame(() => {
-    if (!groupRef.current) return;
-    groupRef.current.children.forEach((child, i) => {
-      const s = streams[i];
-      child.position.y -= s.speed * 0.016;
-      if (child.position.y < -s.height) {
-        child.position.y = 8 + Math.random() * 4;
-        child.position.x = (Math.random() - 0.5) * GRID_SIZE;
-        child.position.z = (Math.random() - 0.5) * GRID_SIZE;
-      }
-    });
-  });
-
-  return (
-    <group ref={groupRef}>
-      {streams.map((s, i) => (
-        <mesh key={i} position={[s.x, s.y, s.z]}>
-          <boxGeometry args={[0.02, s.height, 0.02]} />
-          <meshBasicMaterial color={NEON_GREEN} transparent opacity={s.opacity} />
-        </mesh>
-      ))}
-    </group>
+    <mesh ref={meshRef} position={[0, 5, -8]} rotation={[0, 0, 0]}>
+      <planeGeometry args={[18, 12]} />
+      <meshBasicMaterial map={texture} transparent opacity={0.7} side={THREE.DoubleSide} depthWrite={false} />
+    </mesh>
   );
 }
 
@@ -257,35 +258,43 @@ function NoWebGLFallback({ agentName }: { agentName: string }) {
 
 // ═══ CAMERA DEFAULTS ═══
 
-const DEFAULT_CAM_POS: [number, number, number] = [7, 5.5, 11];
-const DEFAULT_CAM_FOV = 50;
+const DEFAULT_CAM_POS: [number, number, number] = [5.5, 4.5, 9];
+const DEFAULT_CAM_FOV = 48;
 const DEFAULT_CAM_TARGET = new THREE.Vector3(0, 1, 0);
 
-function CameraResetter({ controlsRef }: { controlsRef: React.RefObject<any> }) {
+// Oscillate camera left/right, always facing the front of the character
+function CameraOscillator() {
   const { camera } = useThree();
   const initialized = useRef(false);
+  const baseDistance = Math.sqrt(DEFAULT_CAM_POS[0] ** 2 + DEFAULT_CAM_POS[2] ** 2);
+  const baseY = DEFAULT_CAM_POS[1];
+  const swingAngle = 0.35; // ~20° each side
 
   if (!initialized.current && typeof window !== 'undefined') {
     initialized.current = true;
     if (window.innerWidth < 768 && (camera as THREE.PerspectiveCamera).fov) {
-      (camera as THREE.PerspectiveCamera).fov = 58;
+      (camera as THREE.PerspectiveCamera).fov = 56;
       (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
     }
   }
 
-  const resetCamera = useCallback(() => {
-    camera.position.set(...DEFAULT_CAM_POS);
-    if (controlsRef.current) {
-      controlsRef.current.target.copy(DEFAULT_CAM_TARGET);
-      controlsRef.current.update();
-    }
-  }, [camera, controlsRef]);
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    const angle = Math.sin(t * 0.25) * swingAngle; // slow oscillation
+    camera.position.x = Math.sin(angle) * baseDistance;
+    camera.position.z = Math.cos(angle) * baseDistance;
+    camera.position.y = baseY + Math.sin(t * 0.4) * 0.15; // subtle vertical bob
+    camera.lookAt(DEFAULT_CAM_TARGET);
+  });
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      (window as any).__resetShowcaseCamera = resetCamera;
+      (window as any).__resetShowcaseCamera = () => {
+        camera.position.set(...DEFAULT_CAM_POS);
+        camera.lookAt(DEFAULT_CAM_TARGET);
+      };
     }
-  }, [resetCamera]);
+  }, [camera]);
 
   return null;
 }
@@ -299,7 +308,6 @@ interface AgentShowcase3DProps {
 }
 
 export default function AgentShowcase3D({ modelPath, agentColor, agentName }: AgentShowcase3DProps) {
-  const controlsRef = useRef<any>(null);
   const [error, setError] = useState(false);
 
   const handleResetCamera = useCallback(() => {
@@ -335,25 +343,12 @@ export default function AgentShowcase3D({ modelPath, agentColor, agentName }: Ag
 
           <Suspense fallback={null}>
             <MatrixFloor />
-            <MatrixRain />
-            <MatrixStreams />
+            <MatrixDigitalRain />
             <FloorPlatform agentColor={agentColor} />
             <ShowcaseAgent modelPath={modelPath} agentColor={agentColor} />
           </Suspense>
 
-          <OrbitControls
-            ref={controlsRef}
-            autoRotate
-            autoRotateSpeed={0.3}
-            enablePan={false}
-            enableZoom={true}
-            minDistance={6}
-            maxDistance={20}
-            maxPolarAngle={Math.PI / 2.3}
-            minPolarAngle={Math.PI / 6}
-            target={[0, 1, 0]}
-          />
-          <CameraResetter controlsRef={controlsRef} />
+          <CameraOscillator />
         </Canvas>
       </Suspense>
 
