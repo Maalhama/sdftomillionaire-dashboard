@@ -352,8 +352,8 @@ function NoWebGLFallback({ agentName }: { agentName: string }) {
 
 // ═══ CAMERA DEFAULTS ═══
 
-const DEFAULT_CAM_POS: [number, number, number] = [5, 4, 8];
-const DEFAULT_CAM_FOV = 45;
+const DEFAULT_CAM_POS: [number, number, number] = [7, 5.5, 11];
+const DEFAULT_CAM_FOV = 50;
 const DEFAULT_CAM_TARGET = new THREE.Vector3(0, 1, 0);
 
 // Camera reset helper + mobile FOV adjustment
@@ -435,7 +435,7 @@ export default function AgentShowcase3D({ modelPath, agentColor, agentName }: Ag
           <pointLight color={agentColor} intensity={1.2} distance={8} position={[0, 3, 2]} />
           <hemisphereLight args={['#1a2a1a', '#0a0a0a', 0.4]} />
 
-          <fog attach="fog" args={['#040404', 15, 30]} />
+          <fog attach="fog" args={['#040404', 18, 35]} />
 
           <Suspense fallback={null}>
             {/* Room environment */}
