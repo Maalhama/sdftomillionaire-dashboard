@@ -9,7 +9,7 @@ const navLinks = [
   { href: '/#products', label: 'produits' },
   { href: '/radar', label: 'radar' },
   { href: '/insights', label: 'insights' },
-  { href: '/about', label: 'agents' },
+  { href: '/agents', label: 'agents' },
   { href: '/stage', label: 'stage' },
 ];
 

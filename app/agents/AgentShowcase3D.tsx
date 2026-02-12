@@ -146,19 +146,20 @@ export default function AgentShowcase3D({ modelPath, agentColor, agentName }: Ag
     <div className="w-full h-full relative">
       <Suspense fallback={<LoadingSpinner />}>
         <Canvas
-          camera={{ position: [0, 4, 10], fov: 40 }}
+          camera={{ position: [0, 2.5, 6], fov: 40 }}
           gl={{ antialias: true, alpha: true }}
           style={{ background: 'transparent' }}
           onCreated={(state) => {
             state.gl.setClearColor('#060606', 1);
           }}
         >
-          <ambientLight intensity={0.6} />
-          <directionalLight position={[3, 8, 5]} intensity={1} color="#ffffff" />
-          <pointLight color={agentColor} intensity={0.6} distance={6} position={[0, 3, 2]} />
-          <hemisphereLight args={['#1a2a1a', '#0a0a0a', 0.4]} />
+          <ambientLight intensity={0.8} />
+          <directionalLight position={[3, 8, 5]} intensity={1.2} color="#ffffff" />
+          <directionalLight position={[-3, 5, -3]} intensity={0.4} color="#ffffff" />
+          <pointLight color={agentColor} intensity={1} distance={8} position={[0, 3, 2]} />
+          <hemisphereLight args={['#1a2a1a', '#0a0a0a', 0.5]} />
 
-          <fog attach="fog" args={['#0a0a0a', 8, 15]} />
+          <fog attach="fog" args={['#060606', 12, 25]} />
 
           <Suspense fallback={null}>
             <FloorPlatform agentColor={agentColor} />
