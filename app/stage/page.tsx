@@ -1,35 +1,21 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Pause, Play, RefreshCw, Activity, MessageSquare, Zap, Brain, Rocket } from 'lucide-react';
+import Image from 'next/image';
+import { Pause, Play, Monitor, CheckSquare, MessageCircle, Brain, Zap, MessageSquare, Rocket, Terminal, Activity, Eye, Search, PenTool, Megaphone, BarChart3, RefreshCw } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { supabase, AGENTS, AgentId } from '@/lib/supabase';
 
-const agentAvatars: Record<string, string> = {
-  opus: '/agents/opus.png',
-  brain: '/agents/brain.png',
-  growth: '/agents/growth.png',
-  creator: '/agents/creator.jpg',
-  'twitter-alt': '/agents/twitter-alt.png',
-  'company-observer': '/agents/company-observer.jpg',
-};
+const HQRoom3D = dynamic(() => import('@/components/stage/HQRoom3D'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[360px] sm:h-[520px] flex items-center justify-center font-mono text-xs text-hacker-green">
+      <span className="animate-pulse">// loading 3d_room...</span>
+    </div>
+  ),
+});
 
-const agentColors: Record<string, string> = {
-  opus: '#f59e0b',
-  brain: '#8b5cf6',
-  growth: '#22c55e',
-  creator: '#ec4899',
-  'twitter-alt': '#3b82f6',
-  'company-observer': '#ef4444',
-};
-
-const agentNoms: Record<string, string> = {
-  opus: 'CEO',
-  brain: 'KIRA',
-  growth: 'MADARA',
-  creator: 'STARK',
-  'twitter-alt': 'L',
-  'company-observer': 'USOPP',
-};
+import type { AgentLiveData } from '@/components/stage/HQRoom3D';
 
 interface Event {
   id: string;
@@ -37,7 +23,17 @@ interface Event {
   kind: string;
   title: string;
   summary: string;
+  tags: string[];
+  metadata: any;
   created_at: string;
+}
+
+interface AgentStats {
+  agent_id: string;
+  level: number;
+  experience_points: number;
+  total_missions: number;
+  successful_missions: number;
 }
 
 interface Roundtable {
@@ -52,81 +48,127 @@ interface Roundtable {
     dialogue?: string;
     message?: string;
     turn: number;
+    timestamp?: string;
   }>;
   created_at: string;
 }
 
-interface AgentStats {
-  agent_id: string;
-  level: number;
-  total_missions: number;
-}
+const agentColors: Record<string, string> = {
+  opus: '#f59e0b',
+  brain: '#8b5cf6',
+  growth: '#22c55e',
+  creator: '#ec4899',
+  'twitter-alt': '#3b82f6',
+  'company-observer': '#ef4444',
+};
 
-function tempsEcoule(date: string): string {
-  const minutes = Math.floor((Date.now() - new Date(date).getTime()) / 60000);
-  if (minutes < 1) return "à l'instant";
-  if (minutes < 60) return `il y a ${minutes}m`;
-  const heures = Math.floor(minutes / 60);
-  if (heures < 24) return `il y a ${heures}h`;
-  return `il y a ${Math.floor(heures / 24)}j`;
-}
+const agentNameMap: Record<string, string> = {
+  opus: 'CEO',
+  brain: 'KIRA',
+  growth: 'MADARA',
+  creator: 'STARK',
+  'twitter-alt': 'L',
+  'company-observer': 'USOPP',
+};
 
-export default function PageStage() {
-  const [pause, setPause] = useState(false);
+const statusMap: Record<string, { dot: string; label: string }> = {
+  active: { dot: 'status-active', label: 'ACTIVE' },
+  working: { dot: 'status-working', label: 'WORKING' },
+  idle: { dot: 'status-idle', label: 'IDLE' },
+  sync: { dot: 'status-working', label: 'SYNC' },
+};
+
+export default function StagePage() {
+  const [isPaused, setIsPaused] = useState(false);
+  const [activeTab, setActiveTab] = useState('feed');
   const [events, setEvents] = useState<Event[]>([]);
-  const [stats, setStats] = useState<AgentStats[]>([]);
-  const [roundtable, setRoundtable] = useState<Roundtable | null>(null);
-  const [missionCount, setMissionCount] = useState({ done: 0, total: 0 });
-  const [refresh, setRefresh] = useState(30);
+  const [agentStats, setAgentStats] = useState<AgentStats[]>([]);
+  const [missionCount, setMissionCount] = useState({ completed: 0, total: 0 });
+  const [nextRefresh, setNextRefresh] = useState(30);
+  const [cursorVisible, setCursorVisible] = useState(true);
   const [now, setNow] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeRoundtable, setActiveRoundtable] = useState<Roundtable | null>(null);
 
-  const charger = useCallback(async () => {
-    const [{ data: eventsData }, { data: statsData }, { count: doneCount }, { count: totalCount }] = await Promise.all([
-      supabase.from('ops_agent_events').select('*').order('created_at', { ascending: false }).limit(30),
-      supabase.from('ops_agent_stats').select('*'),
-      supabase.from('ops_missions').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
-      supabase.from('ops_missions').select('*', { count: 'exact', head: true }),
-    ]);
-
+  const fetchData = useCallback(async () => {
+    // Fetch recent events
+    const { data: eventsData } = await supabase
+      .from('ops_agent_events')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(30);
+    
     setEvents(eventsData || []);
-    setStats(statsData || []);
-    setMissionCount({ done: doneCount || 0, total: totalCount || 10 });
 
-    const { data: rtData } = await supabase
+    // Fetch agent stats
+    const { data: statsData } = await supabase
+      .from('ops_agent_stats')
+      .select('*');
+    
+    setAgentStats(statsData || []);
+
+    // Fetch mission counts
+    const { count: completedCount } = await supabase
+      .from('ops_missions')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'completed');
+
+    const { count: totalCount } = await supabase
+      .from('ops_missions')
+      .select('*', { count: 'exact', head: true });
+
+    setMissionCount({
+      completed: completedCount || 0,
+      total: totalCount || 10
+    });
+
+    // Fetch latest roundtable (running or most recent)
+    const { data: roundtableData } = await supabase
       .from('ops_roundtable_queue')
       .select('*')
       .or('status.eq.running,status.eq.pending,status.eq.succeeded')
       .order('created_at', { ascending: false })
       .limit(1);
+    
+    if (roundtableData && roundtableData[0]) {
+      setActiveRoundtable(roundtableData[0] as Roundtable);
+    }
 
-    if (rtData?.[0]) setRoundtable(rtData[0] as Roundtable);
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    charger();
+    fetchData();
     setNow(new Date());
 
+    // Subscribe to realtime events
     const channel = supabase
-      .channel('stage-live')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ops_agent_events' }, (p) => {
-        setEvents(prev => [p.new as Event, ...prev.slice(0, 29)]);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_roundtable_queue' }, (p) => {
-        if (p.new) setRoundtable(p.new as Roundtable);
-      })
+      .channel('stage-events')
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'ops_agent_events' }, 
+        (payload) => {
+          setEvents(prev => [payload.new as Event, ...prev.slice(0, 29)]);
+        }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'ops_roundtable_queue' },
+        (payload) => {
+          if (payload.new) {
+            setActiveRoundtable(payload.new as Roundtable);
+          }
+        }
+      )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [charger]);
+  }, [fetchData]);
 
   useEffect(() => {
-    if (pause) return;
+    if (isPaused) return;
     const interval = setInterval(() => {
-      setRefresh(prev => {
+      setNextRefresh(prev => {
         if (prev <= 0) {
-          charger();
+          fetchData();
           setNow(new Date());
           return 30;
         }
@@ -134,53 +176,139 @@ export default function PageStage() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [pause, charger]);
+  }, [isPaused, fetchData]);
 
-  const getStatut = (agentId: string) => {
-    const recent = events.find(e => e.agent_id === agentId);
-    if (!recent) return 'veille';
-    const min = (Date.now() - new Date(recent.created_at).getTime()) / 60000;
-    if (min < 5) return 'actif';
-    if (min < 15) return 'travail';
-    return 'veille';
+  // Blinking cursor
+  useEffect(() => {
+    const blink = setInterval(() => {
+      setCursorVisible(prev => !prev);
+    }, 530);
+    return () => clearInterval(blink);
+  }, []);
+
+  const getAgentName = (agentId: string) => agentNameMap[agentId] || agentId.toUpperCase();
+  const getAgentColor = (agentId: string) => agentColors[agentId] || '#00ff41';
+  const getAgentEmoji = (agentId: string) => AGENTS[agentId as AgentId]?.emoji || '🤖';
+  const getAgentAvatar = (agentId: string) => AGENTS[agentId as AgentId]?.avatar || '/agents/opus.png';
+
+  const getAgentStatus = (agentId: string) => {
+    const recentEvent = events.find(e => e.agent_id === agentId);
+    if (!recentEvent) return 'idle';
+    
+    const minutesAgo = (Date.now() - new Date(recentEvent.created_at).getTime()) / 60000;
+    if (minutesAgo < 5) return 'active';
+    if (minutesAgo < 15) return 'working';
+    return 'idle';
+  };
+
+  const getEventTypeColor = (kind: string) => {
+    switch (kind) {
+      case 'thought':
+      case 'insight': return 'text-hacker-purple';
+      case 'pulse':
+      case 'heartbeat': return 'text-hacker-green';
+      case 'conversation':
+      case 'chat': return 'text-hacker-cyan';
+      case 'mission':
+      case 'mission_complete': return 'text-hacker-amber';
+      case 'error': return 'text-hacker-red';
+      default: return 'text-hacker-text';
+    }
+  };
+
+  const getEventTypeLabel = (kind: string) => {
+    switch (kind) {
+      case 'thought':
+      case 'insight': return 'THINK';
+      case 'pulse':
+      case 'heartbeat': return 'PULSE';
+      case 'conversation':
+      case 'chat': return 'CHAT';
+      case 'mission':
+      case 'mission_complete': return 'MISSION';
+      case 'error': return 'ERROR';
+      default: return kind.toUpperCase();
+    }
   };
 
   const getEventIcon = (kind: string) => {
     switch (kind) {
       case 'thought':
-      case 'insight': return <Brain className="w-3 h-3" />;
+      case 'insight': return <Brain className="w-3.5 h-3.5" />;
       case 'pulse':
-      case 'heartbeat': return <Zap className="w-3 h-3" />;
+      case 'heartbeat': return <Zap className="w-3.5 h-3.5" />;
       case 'conversation':
-      case 'chat': return <MessageSquare className="w-3 h-3" />;
+      case 'chat': return <MessageSquare className="w-3.5 h-3.5" />;
       case 'mission':
-      case 'mission_complete': return <Rocket className="w-3 h-3" />;
-      default: return <Activity className="w-3 h-3" />;
+      case 'mission_complete': return <Rocket className="w-3.5 h-3.5" />;
+      default: return <Activity className="w-3.5 h-3.5" />;
     }
   };
 
-  const pct = missionCount.total > 0 ? Math.round((missionCount.done / missionCount.total) * 100) : 0;
-  const barre = '█'.repeat(Math.round(pct / 5)) + '░'.repeat(20 - Math.round(pct / 5));
+  const getAgentIcon = (agentId: string) => {
+    switch (agentId) {
+      case 'opus': return <Terminal className="w-3.5 h-3.5" />;
+      case 'brain': return <Brain className="w-3.5 h-3.5" />;
+      case 'growth': return <Search className="w-3.5 h-3.5" />;
+      case 'creator': return <PenTool className="w-3.5 h-3.5" />;
+      case 'twitter-alt': return <Megaphone className="w-3.5 h-3.5" />;
+      case 'company-observer': return <Eye className="w-3.5 h-3.5" />;
+      default: return <Activity className="w-3.5 h-3.5" />;
+    }
+  };
 
-  const agentsData = Object.entries(AGENTS).map(([id, info]) => {
-    const s = stats.find(st => st.agent_id === id);
-    const statut = getStatut(id);
-    const dernierEvent = events.find(e => e.agent_id === id);
+  const formatTimeAgo = (date: string) => {
+    const minutes = Math.floor((Date.now() - new Date(date).getTime()) / 60000);
+    if (minutes < 1) return 'à l\'instant';
+    if (minutes < 60) return `il y a ${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `il y a ${hours}h`;
+    return `il y a ${Math.floor(hours / 24)}j`;
+  };
+
+  // Mission progress bar
+  const progressPercent = missionCount.total > 0 
+    ? Math.round((missionCount.completed / missionCount.total) * 100) 
+    : 0;
+  const barLength = 20;
+  const filled = Math.round((progressPercent / 100) * barLength);
+  const progressBar = '█'.repeat(filled) + '░'.repeat(barLength - filled);
+
+  // Get agents with their stats
+  const agentsWithStats = Object.entries(AGENTS).map(([id, agent]) => {
+    const stats = agentStats.find(s => s.agent_id === id);
+    const status = getAgentStatus(id);
+    const lastEvent = events.find(e => e.agent_id === id);
+    
     return {
       id,
-      nom: agentNoms[id] || info.name,
-      statut,
-      pensee: dernierEvent?.summary || dernierEvent?.title || 'En attente...',
-      level: s?.level || 1,
+      name: agentNameMap[id] || agent.name,
+      emoji: agent.emoji,
+      avatar: agent.avatar,
+      status,
+      thought: lastEvent?.summary || lastEvent?.title || 'En attente...',
+      level: stats?.level || 1,
+      xp: stats?.experience_points || 0,
     };
   });
+
+  // Build live agent data for 3D room
+  const liveAgents: AgentLiveData[] = agentsWithStats.map(a => ({
+    id: a.id,
+    status: a.status as 'active' | 'working' | 'idle' | 'sync',
+    thought: a.thought,
+  }));
+
+  const activeCount = agentsWithStats.filter(a => a.status === 'active').length;
+  const workingCount = agentsWithStats.filter(a => a.status === 'working').length;
+  const idleCount = agentsWithStats.filter(a => a.status === 'idle').length;
 
   if (loading) {
     return (
       <div className="min-h-screen bg-hacker-bg bg-grid flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-hacker-green border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-hacker-green font-mono text-sm">Chargement du stage...</p>
+          <div className="w-10 h-10 border-2 border-hacker-green border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-hacker-green font-mono text-sm">// chargement du stage...</p>
         </div>
       </div>
     );
@@ -188,170 +316,365 @@ export default function PageStage() {
 
   return (
     <div className="min-h-screen bg-hacker-bg bg-grid">
-      <div className="max-w-6xl mx-auto px-4 py-6">
-        {/* En-tête */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+      {/* Header */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-hacker-green flex items-center gap-2">
-              // Le Stage
-              <span className="badge badge-live text-xs">Live</span>
-            </h1>
-            <div className="flex items-center gap-3 text-xs text-hacker-muted font-mono mt-1">
-              <span>{refresh}s</span>
-              <span>•</span>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+              <h1 className="font-mono text-2xl sm:text-3xl font-bold text-hacker-green text-glow">
+                // The Stage
+              </h1>
+              <span className="badge badge-live text-xs">LIVE</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-hacker-muted font-mono mt-1.5">
+              <span className="flex items-center gap-1.5">
+                <Activity className="w-3 h-3 text-hacker-green" />
+                {nextRefresh}s
+              </span>
+              <span className="text-hacker-muted-light">|</span>
               <span>{events.length} événements</span>
-              <span>•</span>
-              <span>{now?.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+              <span className="text-hacker-muted-light">|</span>
+              <span>{now ? now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--'}</span>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => setPause(!pause)} className="btn-secondary text-xs flex items-center gap-1">
-              {pause ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
-              {pause ? 'Reprendre' : 'Pause'}
-            </button>
-            <button onClick={() => { charger(); setRefresh(30); }} className="btn-secondary text-xs flex items-center gap-1">
-              <RefreshCw className="w-3 h-3" />
-              Actualiser
-            </button>
-          </div>
-        </div>
 
-        {/* Monitoring Agents */}
-        <div className="mb-6">
-          <p className="text-xs text-hacker-green font-mono mb-3">// monitoring_agents</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {agentsData.map((agent) => {
-              const color = agentColors[agent.id];
-              const isActif = agent.statut !== 'veille';
-              return (
-                <div
-                  key={agent.id}
-                  className="card-terminal"
-                  style={{ borderColor: isActif ? color : undefined }}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={() => setIsPaused(!isPaused)}
+              className="btn-secondary flex items-center gap-1.5 py-1.5 px-3 text-xs font-mono"
+            >
+              {isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+              {isPaused ? 'RESUME' : 'PAUSE'}
+            </button>
+
+            <button
+              onClick={() => { fetchData(); setNextRefresh(30); }}
+              className="btn-secondary flex items-center gap-1.5 py-1.5 px-3 text-xs font-mono"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              REFRESH
+            </button>
+
+            {/* Terminal-style tabs */}
+            <div className="flex items-center bg-hacker-terminal rounded border border-hacker-border p-0.5">
+              {[
+                { id: 'feed', icon: Monitor, label: '[feed]' },
+                { id: 'tasks', icon: CheckSquare, label: '[tasks]' },
+                { id: 'social', icon: MessageCircle, label: '[social]' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-mono transition-colors ${
+                    activeTab === tab.id
+                      ? 'text-hacker-green bg-hacker-green/10'
+                      : 'text-hacker-muted hover:text-hacker-text'
+                  }`}
                 >
-                  <div className="flex items-center justify-between px-3 py-2 border-b border-hacker-border bg-hacker-terminal">
-                    <div className="flex items-center gap-2">
-                      <span className={`w-1.5 h-1.5 rounded-full ${
-                        agent.statut === 'actif' ? 'bg-hacker-green animate-pulse' : 
-                        agent.statut === 'travail' ? 'bg-hacker-amber' : 'bg-hacker-muted'
-                      }`} />
-                      <span className="text-xs font-bold" style={{ color }}>{agent.nom}</span>
-                      <span className="text-[10px] text-hacker-muted">Nv.{agent.level}</span>
-                    </div>
-                    <span className="text-[10px] text-hacker-muted uppercase">
-                      {agent.statut === 'actif' ? 'ACTIF' : agent.statut === 'travail' ? 'TRAVAIL' : 'VEILLE'}
-                    </span>
-                  </div>
-                  <div className="px-3 py-2 text-xs">
-                    <span className="text-hacker-muted">&gt; </span>
-                    <span className="text-hacker-text">{agent.pensee}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Progression Missions */}
-        <div className="card-terminal p-4 mb-6">
-          <p className="text-xs text-hacker-green font-mono mb-2">// progression_missions</p>
-          <div className="font-mono text-sm">
-            <span className="text-hacker-amber">MISSIONS {missionCount.done}/{missionCount.total}</span>
-            <span className="text-hacker-muted mx-2">[</span>
-            <span className="text-hacker-green">{barre}</span>
-            <span className="text-hacker-muted">]</span>
-            <span className="text-hacker-text ml-2">{pct}%</span>
-          </div>
-        </div>
-
-        {/* Conversation Live */}
-        {roundtable && (
-          <div className="mb-6">
-            <p className="text-xs text-hacker-green font-mono mb-3">// conversation_live</p>
-            <div className="terminal">
-              <div className="terminal-header">
-                <div className="terminal-dot red" />
-                <div className="terminal-dot yellow" />
-                <div className="terminal-dot green" />
-                <span className="text-xs text-hacker-muted ml-3 font-mono">
-                  roundtable --format={roundtable.format}
-                </span>
-                <span className={`ml-auto badge ${roundtable.status === 'running' ? 'badge-live' : 'badge-muted'} text-[10px]`}>
-                  {roundtable.status === 'running' ? '🔴 Live' : roundtable.status.toUpperCase()}
-                </span>
-              </div>
-
-              <div className="p-4 max-h-[350px] overflow-y-auto">
-                <div className="mb-3 pb-2 border-b border-hacker-border">
-                  <p className="text-sm text-hacker-amber mb-1">💬 {roundtable.topic}</p>
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    {roundtable.participants.map((p) => (
-                      <span key={p} className="badge badge-muted" style={{ color: agentColors[p] }}>
-                        {agentNoms[p] || p}
-                      </span>
-                    ))}
-                    <span className="text-hacker-muted ml-2">
-                      {roundtable.turn_count} tours
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  {roundtable.conversation_log?.map((tour, idx) => (
-                    <div key={idx} className="font-mono text-xs">
-                      <span className="text-hacker-muted">[{idx + 1}]</span>{' '}
-                      <span style={{ color: agentColors[tour.speaker] }} className="font-bold">
-                        {agentNoms[tour.speaker] || tour.speaker}:
-                      </span>{' '}
-                      <span className="text-hacker-text">{tour.dialogue || tour.message}</span>
-                    </div>
-                  ))}
-                  {roundtable.status === 'running' && (
-                    <div className="font-mono text-xs text-hacker-green animate-pulse">
-                      ▋ en attente...
-                    </div>
-                  )}
-                </div>
-              </div>
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
-        )}
+        </div>
+      </div>
 
-        {/* Fil d'événements */}
-        <div>
-          <p className="text-xs text-hacker-green font-mono mb-3">// fil_événements</p>
+      {/* ══ HQ ROOM VIEW — 3D ══ */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="font-mono text-sm text-hacker-green">// hq_room_view</span>
+          <span className="badge badge-live text-[10px]">3D LIVE</span>
+        </div>
+
+        <div className="terminal">
+          <div className="terminal-header">
+            <div className="terminal-dot red" />
+            <div className="terminal-dot yellow" />
+            <div className="terminal-dot green" />
+            <span className="ml-3 text-xs text-hacker-muted-light font-mono">
+              room.render --mode=3d --floor=hq --engine=webgl
+            </span>
+          </div>
+
+          <div className="terminal-body !max-h-none p-0">
+            <HQRoom3D liveAgents={liveAgents} />
+
+            {/* Room Footer - Status bar */}
+            <div className="flex items-center justify-between px-4 py-2 bg-hacker-terminal border-t border-hacker-border font-mono text-[10px] text-hacker-muted">
+              <span>
+                <span className="text-hacker-green">●</span> {activeCount} actifs
+                <span className="mx-2 text-hacker-border">|</span>
+                <span className="text-hacker-amber">●</span> {workingCount} en cours
+                <span className="mx-2 text-hacker-border">|</span>
+                <span className="text-hacker-muted-light">●</span> {idleCount} inactifs
+              </span>
+              <span className="text-hacker-green/50">glisser pour tourner // scroll pour zoomer // survoler les agents</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Agent Monitoring Grid */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-5">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="font-mono text-sm text-hacker-green">// agent_monitoring</span>
+          <span className="font-mono text-xs text-hacker-muted">
+            {activeCount + workingCount}/{agentsWithStats.length} actifs
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {agentsWithStats.map((agent) => {
+            const color = getAgentColor(agent.id);
+            const statusInfo = statusMap[agent.status] || statusMap['idle'];
+            const isActive = agent.status !== 'idle';
+
+            return (
+              <div
+                key={agent.id}
+                className="card-terminal relative overflow-hidden"
+                style={{ borderColor: isActive ? color : undefined }}
+              >
+                {/* Terminal header bar */}
+                <div className="flex items-center justify-between px-3 py-1.5 border-b border-hacker-border bg-hacker-terminal">
+                  <div className="flex items-center gap-2">
+                    <span className={`status-dot ${statusInfo.dot}`} />
+                    <span className="font-mono text-xs font-bold" style={{ color }}>
+                      {agent.name}
+                    </span>
+                    <span className="text-hacker-muted font-mono text-[10px]">
+                      LV.{agent.level}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="badge badge-muted text-[10px] font-mono">{statusInfo.label}</span>
+                    <span style={{ color }} className="opacity-70">
+                      {getAgentIcon(agent.id)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Terminal body */}
+                <div className="px-3 py-2.5 bg-hacker-bg/50 min-h-[72px] flex flex-col justify-between">
+                  <div className="font-mono text-xs text-hacker-text leading-relaxed line-clamp-2">
+                    <span className="text-hacker-muted select-none">{'>'}_  </span>
+                    {agent.thought}
+                  </div>
+                  <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-hacker-border/50">
+                    <span className="font-mono text-[10px] text-hacker-muted">
+                      {events.find(e => e.agent_id === agent.id)
+                        ? formatTimeAgo(events.find(e => e.agent_id === agent.id)!.created_at)
+                        : 'n/a'
+                      }
+                    </span>
+                    {isActive && (
+                      <span className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: color }} />
+                        <span className="font-mono text-[10px]" style={{ color }}>en cours...</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Mission Progress */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-5">
+        <div className="card-terminal p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="font-mono text-sm text-hacker-green">// mission_progress</span>
+          </div>
+          <div className="font-mono text-sm overflow-x-auto">
+            <span className="text-hacker-amber">MISSIONS {missionCount.completed}/{missionCount.total}</span>
+            <span className="text-hacker-muted mx-3">[</span>
+            <span className="text-hacker-green">{progressBar}</span>
+            <span className="text-hacker-muted">]</span>
+            <span className="text-hacker-text ml-3">{progressPercent}%</span>
+          </div>
+          <div className="flex items-center gap-4 mt-2 font-mono text-xs text-hacker-muted">
+            <span>dernière sync: {now?.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+            <span className="text-hacker-muted-light">|</span>
+            <span>
+              status: <span className="text-hacker-green">LIVE</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Live Conversation Feed */}
+      {activeRoundtable && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-5">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="font-mono text-sm text-hacker-green">// live_conversation</span>
+            <span className={`badge ${activeRoundtable.status === 'running' ? 'badge-live' : 'badge-muted'} text-[10px]`}>
+              {activeRoundtable.status === 'running' ? '🔴 LIVE' : activeRoundtable.status.toUpperCase()}
+            </span>
+          </div>
+
           <div className="terminal">
             <div className="terminal-header">
               <div className="terminal-dot red" />
               <div className="terminal-dot yellow" />
               <div className="terminal-dot green" />
-              <span className="text-xs text-hacker-muted ml-3 font-mono">tail -f /var/log/events</span>
+              <span className="ml-3 text-xs text-hacker-muted-light font-mono">
+                roundtable --format={activeRoundtable.format} --topic=&quot;{activeRoundtable.topic.slice(0, 40)}...&quot;
+              </span>
             </div>
 
-            <div className="p-4 max-h-[400px] overflow-y-auto space-y-1">
+            <div className="terminal-body p-4 max-h-[400px] overflow-y-auto">
+              <div className="mb-3 pb-2 border-b border-hacker-border">
+                <div className="font-mono text-sm text-hacker-amber mb-1">💬 {activeRoundtable.topic}</div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {activeRoundtable.participants.map((p) => (
+                    <span key={p} className="badge badge-muted" style={{ color: agentColors[p] || '#00ff41' }}>
+                      {agentNameMap[p] || p}
+                    </span>
+                  ))}
+                  <span className="text-hacker-muted ml-2">
+                    {activeRoundtable.turn_count}/{activeRoundtable.conversation_log?.length || 12} tours
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {activeRoundtable.conversation_log?.map((turn, idx) => {
+                  const speakerColor = agentColors[turn.speaker] || '#00ff41';
+                  const speakerName = agentNameMap[turn.speaker] || turn.speaker.toUpperCase();
+                  const message = turn.dialogue || turn.message || '';
+                  
+                  return (
+                    <div key={idx} className="font-mono text-xs">
+                      <span className="text-hacker-muted">[{idx + 1}]</span>{' '}
+                      <span style={{ color: speakerColor }} className="font-bold">{speakerName}:</span>{' '}
+                      <span className="text-hacker-text">{message}</span>
+                    </div>
+                  );
+                })}
+                
+                {activeRoundtable.status === 'running' && (
+                  <div className="font-mono text-xs text-hacker-green animate-pulse">
+                    <span className="text-hacker-muted">[{(activeRoundtable.conversation_log?.length || 0) + 1}]</span>{' '}
+                    ▋ en attente de réponse...
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stats Summary */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-5">
+        <div className="card-terminal p-3">
+          <div className="flex flex-wrap items-center gap-3 font-mono text-xs">
+            <span className="text-hacker-green">// stats</span>
+            <span className="badge badge-muted">
+              <BarChart3 className="w-3 h-3 inline mr-1" />
+              {events.filter(e => e.kind === 'insight').length} insights
+            </span>
+            <span className="badge badge-muted">
+              <Search className="w-3 h-3 inline mr-1" />
+              {events.filter(e => e.kind === 'mission' || e.kind === 'mission_complete').length} missions
+            </span>
+            <span className="badge badge-muted">
+              <PenTool className="w-3 h-3 inline mr-1" />
+              {events.filter(e => e.kind === 'conversation' || e.kind === 'chat').length} conversations
+            </span>
+            <span className="ml-auto text-hacker-muted flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-hacker-green animate-pulse" />
+              SUPABASE REALTIME
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Live Event Feed */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="font-mono text-sm text-hacker-green">// live_event_feed</span>
+          <span className="font-mono text-xs text-hacker-muted">{events.length} entrées</span>
+        </div>
+
+        <div className="terminal">
+          <div className="terminal-header">
+            <div className="terminal-dot" style={{ background: '#ff5f57' }} />
+            <div className="terminal-dot" style={{ background: '#febc2e' }} />
+            <div className="terminal-dot" style={{ background: '#28c840' }} />
+            <span className="ml-3 text-hacker-muted text-xs font-mono">tail -f /var/log/events.log</span>
+          </div>
+
+          <div className="terminal-body p-0">
+            <div className="p-4 space-y-0 max-h-[520px] overflow-y-auto">
               {events.length === 0 ? (
-                <div className="text-center py-8">
-                  <Activity className="w-8 h-8 text-hacker-muted mx-auto mb-2" />
-                  <p className="text-hacker-muted text-sm">Aucun événement récent</p>
+                <div className="text-center py-12">
+                  <Activity className="w-12 h-12 text-hacker-muted mx-auto mb-4" />
+                  <p className="text-hacker-muted font-mono text-sm">// aucun événement récent</p>
+                  <p className="text-hacker-muted-light text-xs mt-2">Les agents sont au repos</p>
                 </div>
               ) : (
-                events.map((event) => (
-                  <div
-                    key={event.id}
-                    className="flex items-start gap-2 py-1.5 border-b border-hacker-border/30 font-mono text-xs"
-                  >
-                    <span className="text-hacker-muted w-16 shrink-0">{tempsEcoule(event.created_at)}</span>
-                    <span className="font-bold w-16 shrink-0" style={{ color: agentColors[event.agent_id] }}>
-                      {agentNoms[event.agent_id]}
-                    </span>
-                    <span className="text-hacker-muted">{getEventIcon(event.kind)}</span>
-                    <span className="text-hacker-text">{event.title || event.summary}</span>
-                  </div>
-                ))
+                events.map((event) => {
+                  const typeColor = getEventTypeColor(event.kind);
+                  const agentColor = getAgentColor(event.agent_id);
+                  const agentName = getAgentName(event.agent_id);
+
+                  return (
+                    <div
+                      key={event.id}
+                      className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-0 py-2 border-b border-hacker-border/30 last:border-b-0 font-mono text-xs hover:bg-hacker-green/[0.03] transition-colors"
+                    >
+                      {/* Mobile: meta row (timestamp + agent + type) */}
+                      <div className="flex items-center gap-2 sm:contents">
+                        {/* Timestamp */}
+                        <span className="text-hacker-muted sm:w-24 flex-shrink-0 text-[11px]">
+                          {formatTimeAgo(event.created_at)}
+                        </span>
+
+                        {/* Separator - desktop only */}
+                        <span className="text-hacker-border mx-1 flex-shrink-0 hidden sm:inline">|</span>
+
+                        {/* Agent name */}
+                        <span
+                          className="sm:w-20 flex-shrink-0 font-bold text-[11px]"
+                          style={{ color: agentColor }}
+                        >
+                          {agentName}
+                        </span>
+
+                        {/* Separator - desktop only */}
+                        <span className="text-hacker-border mx-1 flex-shrink-0 hidden sm:inline">|</span>
+
+                        {/* Event type icon + badge */}
+                        <span className={`flex items-center gap-1 sm:w-20 flex-shrink-0 ${typeColor}`}>
+                          {getEventIcon(event.kind)}
+                          <span className="text-[10px] uppercase">{getEventTypeLabel(event.kind)}</span>
+                        </span>
+                      </div>
+
+                      {/* Separator - desktop only */}
+                      <span className="text-hacker-border mx-1 flex-shrink-0 hidden sm:inline">|</span>
+
+                      {/* Content */}
+                      <div className={`flex-1 text-[11px] leading-relaxed ${typeColor} pl-0 sm:pl-0`}>
+                        <span>{event.title || event.summary || 'Événement'}</span>
+                        {event.summary && event.title && (
+                          <span className="text-hacker-muted ml-2">// {event.summary}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
               )}
-              <div className="flex items-center gap-2 pt-2 border-t border-hacker-border">
-                <span className="text-hacker-green animate-blink">█</span>
-                <span className="text-hacker-green/70 text-xs">écoute Supabase...</span>
+
+              {/* Listening indicator */}
+              <div className="flex items-center gap-2 pt-4 mt-2 border-t border-hacker-border">
+                <span className="text-hacker-green text-sm" style={{ opacity: cursorVisible ? 1 : 0 }}>
+                  █
+                </span>
+                <span className="font-mono text-xs text-hacker-green/70 tracking-wider">
+                  écoute Supabase realtime...
+                </span>
               </div>
             </div>
           </div>
