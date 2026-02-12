@@ -130,14 +130,20 @@ export default function HomePage() {
     setSubmitError('');
 
     try {
-      const { error } = await supabase
-        .from('user_prompts')
-        .insert({
+      const res = await fetch('/api/prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           content: trimmed,
           author_name: authorName.trim() || 'Anonyme',
-        });
+        }),
+      });
 
-      if (error) throw error;
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Erreur lors de la soumission');
+      }
 
       setSubmitted(true);
       localStorage.setItem('lastSubmitDate', new Date().toISOString().split('T')[0]);
