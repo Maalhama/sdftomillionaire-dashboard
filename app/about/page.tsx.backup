@@ -176,7 +176,7 @@ export default function AboutPage() {
             <div className="terminal-dot yellow" />
             <div className="terminal-dot green" />
             <span className="ml-3 text-xs text-hacker-muted-light font-mono">
-              sdf@hq ~ cat agent.json | jq &apos;.{selectedAgent.name.toLowerCase()}&apos;
+              vox-yz@hq ~ cat agent.json | jq &apos;.{selectedAgent.name.toLowerCase()}&apos;
             </span>
             <div className="ml-auto flex items-center gap-2">
               <Terminal className="w-3.5 h-3.5 text-hacker-muted-light" />
@@ -477,7 +477,7 @@ export default function AboutPage() {
       {/* ── Footer Tagline ── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 text-center">
         <p className="text-xs text-hacker-muted font-mono uppercase tracking-widest">
-          <span className="text-hacker-green">$</span> echo &quot;2026 // SYSTÈME SDFTOMILLIONAIRE // 6 AGENTS // 1 MISSION&quot;
+          <span className="text-hacker-green">$</span> echo &quot;ÉTÉ 2026 // SYSTÈME VOX-YZ // 6 AGENTS // 1 MISSION&quot;
         </p>
       </section>
     </div>

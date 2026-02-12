@@ -10,8 +10,8 @@ const insights = [
     title: 'Architecture des Personnalités IA - Framework RPG (Présentation)',
     description: 'Présentation (15 slides) : fiches de rôle, interdictions strictes, dérive relationnelle, stats RPG, et l\'effet Tamagotchi.',
     type: 'insight',
-    author: 'vox',
-    authorEmoji: '\uD83E\uDD16',
+    author: 'SDF',
+    authorEmoji: '🤖',
     date: '11 Fév 2026',
     pinned: true
   },

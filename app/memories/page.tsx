@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase, AGENTS, AgentId } from '@/lib/supabase';
+import { Brain, Filter, Clock, Tag, Sparkles } from 'lucide-react';
 
 interface Memory {
   id: string;
@@ -13,6 +14,23 @@ interface Memory {
   source_type: string;
   created_at: string;
 }
+
+const agentColors: Record<string, string> = {
+  opus: '#f59e0b',
+  brain: '#8b5cf6',
+  growth: '#22c55e',
+  creator: '#ec4899',
+  'twitter-alt': '#3b82f6',
+  'company-observer': '#ef4444',
+};
+
+const memoryTypeConfig: Record<string, { badge: string; icon: string }> = {
+  insight: { badge: 'badge-purple', icon: '💡' },
+  pattern: { badge: 'badge-cyan', icon: '🔄' },
+  strategy: { badge: 'badge-amber', icon: '🎯' },
+  lesson: { badge: 'badge-live', icon: '📚' },
+  observation: { badge: 'badge-muted', icon: '👁️' },
+};
 
 export default function MemoriesPage() {
   const [memories, setMemories] = useState<Memory[]>([]);
@@ -53,128 +71,234 @@ export default function MemoriesPage() {
   const memoryTypes = Array.from(new Set(memories.map(m => m.memory_type)));
 
   const getAgentInfo = (agentId: string) => {
-    return AGENTS[agentId as AgentId] || { name: agentId, emoji: '🤖', color: '#888' };
+    return AGENTS[agentId as AgentId] || { name: agentId, emoji: '🤖', color: '#888', role: 'Agent' };
+  };
+
+  const getMemoryCount = (agentId: string) => {
+    return memories.filter(m => m.agent_id === agentId).length;
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="w-8 h-8 border-2 border-sdftomillionaire-accent border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-hacker-bg bg-grid flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-hacker-green border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-hacker-green font-mono text-sm">// chargement des mémoires...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Mémoires</h1>
-        <div className="flex gap-3">
-          {/* Agent Filter */}
-          <select 
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="bg-sdftomillionaire-card border border-sdftomillionaire-border rounded-lg px-3 py-2 text-sm"
-          >
-            <option value="all">Tous les agents</option>
-            {Object.entries(AGENTS).map(([id, agent]) => (
-              <option key={id} value={id}>{agent.emoji} {agent.name}</option>
-            ))}
-          </select>
-          
-          {/* Type Filter */}
-          <select 
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="bg-sdftomillionaire-card border border-sdftomillionaire-border rounded-lg px-3 py-2 text-sm"
-          >
-            <option value="all">Tous les types</option>
-            {memoryTypes.map(type => (
-              <option key={type} value={type}>{type}</option>
-            ))}
-          </select>
+    <div className="min-h-screen bg-hacker-bg bg-grid">
+      {/* ═══ HEADER ═══ */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-6">
+        <p className="text-hacker-green text-sm mb-2 font-mono">// memory_bank</p>
+        <div className="flex items-center gap-4 mb-4">
+          <h1 className="text-3xl md:text-4xl font-bold text-white">
+            Mémoires
+          </h1>
+          <span className="badge badge-live">LIVE</span>
+          <span className="badge badge-muted">{memories.length} entrées</span>
         </div>
-      </div>
+        <p className="text-hacker-muted-light">
+          Insights, patterns, et leçons apprises par chaque agent. Mise à jour en temps réel.
+        </p>
+      </section>
 
-      {/* Stats */}
-      <div className="grid grid-cols-6 gap-3">
-        {Object.entries(AGENTS).map(([id, agent]) => {
-          const count = memories.filter(m => m.agent_id === id).length;
-          return (
-            <button
-              key={id}
-              onClick={() => setFilter(filter === id ? 'all' : id)}
-              className={`p-3 rounded-xl border text-center transition ${
-                filter === id
-                  ? 'bg-sdftomillionaire-accent/20 border-sdftomillionaire-accent'
-                  : 'bg-sdftomillionaire-card border-sdftomillionaire-border hover:border-sdftomillionaire-accent/30'
-              }`}
-            >
-              <span className="text-2xl">{agent.emoji}</span>
-              <p className="text-xl font-bold mt-1">{count}</p>
-              <p className="text-xs text-gray-500">{agent.name}</p>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Memories List */}
-      <div className="bg-sdftomillionaire-card border border-sdftomillionaire-border rounded-xl overflow-hidden">
-        <div className="divide-y divide-sdftomillionaire-border">
-          {filteredMemories.map((memory) => {
-            const agent = getAgentInfo(memory.agent_id);
+      {/* ═══ AGENT STATS GRID ═══ */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {Object.entries(AGENTS).map(([id, agent]) => {
+            const count = getMemoryCount(id);
+            const color = agentColors[id] || '#888';
+            const isSelected = filter === id;
+            
             return (
-              <div key={memory.id} className="p-4 hover:bg-white/5 transition animate-slide-up">
-                <div className="flex items-start gap-4">
-                  <div 
-                    className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-xl"
-                    style={{ backgroundColor: `${agent.color}20` }}
-                  >
-                    {agent.emoji}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold" style={{ color: agent.color }}>
-                        {agent.name}
-                      </span>
-                      <span className={`text-xs px-2 py-0.5 rounded ${
-                        memory.memory_type === 'insight' ? 'bg-purple-500/20 text-purple-400' :
-                        memory.memory_type === 'pattern' ? 'bg-blue-500/20 text-blue-400' :
-                        memory.memory_type === 'strategy' ? 'bg-orange-500/20 text-orange-400' :
-                        memory.memory_type === 'lesson' ? 'bg-green-500/20 text-green-400' :
-                        'bg-gray-500/20 text-gray-400'
-                      }`}>
-                        {memory.memory_type}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {memory.confidence ? `${Math.round(memory.confidence * 100)}% confiance` : ''}
-                      </span>
-                    </div>
-                    <p className="text-gray-300">{memory.content}</p>
-                    {memory.tags && memory.tags.length > 0 && (
-                      <div className="flex gap-1 mt-2">
-                        {memory.tags.map((tag, i) => (
-                          <span key={i} className="text-xs bg-sdftomillionaire-border px-2 py-0.5 rounded">
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-xs text-gray-500 text-right flex-shrink-0">
-                    <p>{new Date(memory.created_at).toLocaleDateString('fr-FR')}</p>
-                    <p>{new Date(memory.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</p>
-                  </div>
-                </div>
-              </div>
+              <button
+                key={id}
+                onClick={() => setFilter(filter === id ? 'all' : id)}
+                className={`card p-4 text-center transition-all ${
+                  isSelected ? 'border-2' : 'hover:border-hacker-green/30'
+                }`}
+                style={{ 
+                  borderColor: isSelected ? color : undefined,
+                  boxShadow: isSelected ? `0 0 15px ${color}33` : undefined
+                }}
+              >
+                <span className="text-2xl block mb-1">{agent.emoji}</span>
+                <p className="text-2xl font-bold" style={{ color }}>{count}</p>
+                <p className="text-[10px] text-hacker-muted uppercase tracking-wider">{agent.name}</p>
+              </button>
             );
           })}
-          {filteredMemories.length === 0 && (
-            <div className="p-8 text-center text-gray-500">
-              Aucune mémoire trouvée
-            </div>
-          )}
         </div>
-      </div>
+      </section>
+
+      {/* ═══ FILTERS ═══ */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 text-hacker-green font-mono text-sm">
+            <Filter className="w-4 h-4" />
+            <span>$ filter --type=</span>
+          </div>
+          
+          <button
+            onClick={() => setTypeFilter('all')}
+            className={`px-3 py-1.5 rounded text-xs font-mono transition-all ${
+              typeFilter === 'all'
+                ? 'bg-hacker-green/10 text-hacker-green border border-hacker-green/30'
+                : 'text-hacker-muted-light border border-transparent hover:text-hacker-text hover:border-hacker-border'
+            }`}
+          >
+            all
+          </button>
+          
+          {memoryTypes.map(type => {
+            const config = memoryTypeConfig[type] || { badge: 'badge-muted', icon: '📝' };
+            return (
+              <button
+                key={type}
+                onClick={() => setTypeFilter(typeFilter === type ? 'all' : type)}
+                className={`px-3 py-1.5 rounded text-xs font-mono transition-all flex items-center gap-1.5 ${
+                  typeFilter === type
+                    ? 'bg-hacker-green/10 text-hacker-green border border-hacker-green/30'
+                    : 'text-hacker-muted-light border border-transparent hover:text-hacker-text hover:border-hacker-border'
+                }`}
+              >
+                <span>{config.icon}</span>
+                {type}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ═══ MEMORIES LIST ═══ */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+        <div className="terminal">
+          <div className="terminal-header">
+            <div className="terminal-dot red" />
+            <div className="terminal-dot yellow" />
+            <div className="terminal-dot green" />
+            <span className="ml-3 text-xs text-hacker-muted-light font-mono">
+              tail -f /var/log/agent_memories.log | grep "{filter !== 'all' ? filter : '*'}"
+            </span>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-[10px] text-hacker-muted">
+                {filteredMemories.length} résultats
+              </span>
+            </div>
+          </div>
+
+          <div className="max-h-[700px] overflow-y-auto divide-y divide-hacker-border">
+            {filteredMemories.map((memory, i) => {
+              const agent = getAgentInfo(memory.agent_id);
+              const color = agentColors[memory.agent_id] || '#888';
+              const typeConfig = memoryTypeConfig[memory.memory_type] || { badge: 'badge-muted', icon: '📝' };
+              
+              return (
+                <div 
+                  key={memory.id} 
+                  className="p-4 hover:bg-hacker-card-hover transition-all animate-fade-in"
+                  style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
+                >
+                  <div className="flex items-start gap-4">
+                    {/* Agent Avatar */}
+                    <div 
+                      className="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center text-xl border"
+                      style={{ 
+                        backgroundColor: `${color}15`,
+                        borderColor: `${color}40`
+                      }}
+                    >
+                      {agent.emoji}
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <span className="font-bold text-sm" style={{ color }}>
+                          {agent.name}
+                        </span>
+                        <span className={`badge ${typeConfig.badge} text-[10px]`}>
+                          {typeConfig.icon} {memory.memory_type}
+                        </span>
+                        {memory.confidence && (
+                          <span className="text-[10px] text-hacker-muted font-mono">
+                            {Math.round(memory.confidence * 100)}% confiance
+                          </span>
+                        )}
+                      </div>
+                      
+                      <p className="text-sm text-hacker-text leading-relaxed mb-2">
+                        {memory.content}
+                      </p>
+                      
+                      {/* Tags */}
+                      {memory.tags && memory.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {memory.tags.map((tag, j) => (
+                            <span 
+                              key={j} 
+                              className="text-[10px] bg-hacker-border px-2 py-0.5 rounded text-hacker-muted-light font-mono"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Timestamp */}
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-[10px] text-hacker-muted font-mono">
+                        {new Date(memory.created_at).toLocaleDateString('fr-FR')}
+                      </p>
+                      <p className="text-[10px] text-hacker-muted font-mono">
+                        {new Date(memory.created_at).toLocaleTimeString('fr-FR', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {filteredMemories.length === 0 && (
+              <div className="p-12 text-center">
+                <Brain className="w-12 h-12 text-hacker-muted mx-auto mb-4" />
+                <p className="text-hacker-muted font-mono text-sm">
+                  // aucune mémoire trouvée
+                </p>
+                <p className="text-hacker-muted-light text-xs mt-2">
+                  Essaie de modifier les filtres
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-hacker-border p-3 bg-hacker-terminal">
+            <div className="flex items-center justify-center gap-4 text-[10px] font-mono text-hacker-muted">
+              <span className="flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-hacker-green" />
+                Realtime Supabase
+              </span>
+              <span>|</span>
+              <span>
+                Total: <span className="text-hacker-green">{memories.length}</span> mémoires
+              </span>
+              <span>|</span>
+              <span>
+                Agents: <span className="text-hacker-cyan">{Object.keys(AGENTS).length}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

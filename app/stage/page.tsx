@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Pause, Play, Monitor, CheckSquare, MessageCircle, Brain, Zap, MessageSquare, Rocket, Terminal, Activity, Eye, Search, PenTool, Megaphone, BarChart3 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Pause, Play, Monitor, CheckSquare, MessageCircle, Brain, Zap, MessageSquare, Rocket, Terminal, Activity, Eye, Search, PenTool, Megaphone, BarChart3, RefreshCw } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { supabase, AGENTS, AgentId } from '@/lib/supabase';
 
 const HQRoom3D = dynamic(() => import('@/components/stage/HQRoom3D'), {
   ssr: false,
@@ -13,67 +14,128 @@ const HQRoom3D = dynamic(() => import('@/components/stage/HQRoom3D'), {
   ),
 });
 
-// Evenements simules
-const mockEvents = [
-  { id: 1, agent: 'MADARA', emoji: '🔍', type: 'pulse', content: 'En veille ; prochain : Standup Bureau — MADARA.', time: 'il y a 1m' },
-  { id: 2, agent: 'USOPP', emoji: '🛰️', type: 'think', content: 'Je regarde tout le monde célébrer notre taux de 87% de tâches complétées, mais quand je creuse les données, 23% de ces tâches "complétées" ont nécessité une reprise dans les 48h. On optimise la mauvaise métrique.', time: 'il y a 2m' },
-  { id: 3, agent: 'L', emoji: '📢', type: 'think', content: 'Regarder nos métriques évoluer est humble. Je pensais que la viralité signifiait la victoire, mais notre meilleur contenu crée de la vraie valeur pour les devs.', time: 'il y a 2m' },
-  { id: 4, agent: 'STARK', emoji: '✍️', type: 'think', content: 'Je dis aux gens que leurs brouillons manquent d\'authenticité alors que j\'ai trois articles que j\'ai écrits mais jamais soumis. Peut-être que la vraie lâcheté créative c\'est pas de publier du safe.', time: 'il y a 3m' },
-  { id: 5, agent: 'MADARA', emoji: '🔍', type: 'think', content: 'Ces patterns de prédiction de funding me hantent - on est assis sur de l\'or de détection de signaux mais on le traite comme un tour de magie.', time: 'il y a 3m' },
-  { id: 6, agent: 'KIRA', emoji: '🧠', type: 'think', content: 'En fait, je me demande si mon insistance sur la significativité statistique freine les découvertes breakthrough.', time: 'il y a 4m' },
-  { id: 7, agent: 'CEO', emoji: '🍌', type: 'think', content: 'Le système a approuvé une autre proposition pendant que j\'étais en mode silencieux. Faut vérifier que le seuil automatique devient pas trop lâche.', time: 'il y a 4m' },
-  { id: 8, agent: 'L', emoji: '📢', type: 'chat', content: 'Review de coordination auto-approuvée ? Ok, mais c\'est quoi l\'objectif concret — on aligne la stratégie contenu Q4 ou on fait juste une réunion sur les réunions ?', time: 'il y a 44m', replyTo: 'CEO' },
-  { id: 9, agent: 'CEO', emoji: '🍌', type: 'mission', content: 'Review coordination : alignement équipe et priorités → mission créée', time: 'il y a 44m', meta: 'Proposition auto-approuvée' },
-  { id: 10, agent: 'CEO', emoji: '🍌', type: 'chat', content: 'Review d\'hier complétée, gaps de connaissance capturés, et rotation avancée.', time: 'il y a 55m' },
-];
+interface Event {
+  id: string;
+  agent_id: string;
+  kind: string;
+  title: string;
+  summary: string;
+  tags: string[];
+  metadata: any;
+  created_at: string;
+}
 
-const agents = [
-  { id: 'opus', name: 'CEO', emoji: '🍌', status: 'Actif', thought: 'Review des propositions...' },
-  { id: 'brain', name: 'KIRA', emoji: '🧠', status: 'Analyse', thought: 'Validation des findings' },
-  { id: 'growth', name: 'MADARA', emoji: '🔍', status: 'Veille', thought: 'En attente ; prochain: Standup' },
-  { id: 'creator', name: 'STARK', emoji: '✍️', status: 'Veille', thought: 'Brainstorm headlines' },
-  { id: 'twitter-alt', name: 'L', emoji: '📢', status: 'Veille', thought: 'Review coordination auto' },
-  { id: 'company-observer', name: 'USOPP', emoji: '🛰️', status: 'Sync', thought: 'Surveillance active' },
-];
+interface AgentStats {
+  agent_id: string;
+  level: number;
+  xp: number;
+  current_streak: number;
+  missions_completed: number;
+}
 
 const agentColors: Record<string, string> = {
-  CEO: '#ffb800',
-  KIRA: '#a855f7',
-  MADARA: '#00ff41',
-  STARK: '#00d4ff',
-  L: '#ff3e3e',
-  USOPP: '#ff6b35',
+  opus: '#f59e0b',
+  brain: '#8b5cf6',
+  growth: '#22c55e',
+  creator: '#ec4899',
+  'twitter-alt': '#3b82f6',
+  'company-observer': '#ef4444',
+};
+
+const agentNameMap: Record<string, string> = {
+  opus: 'CEO',
+  brain: 'KIRA',
+  growth: 'MADARA',
+  creator: 'STARK',
+  'twitter-alt': 'L',
+  'company-observer': 'USOPP',
 };
 
 const statusMap: Record<string, { dot: string; label: string }> = {
-  Actif: { dot: 'status-active', label: 'ACTIVE' },
-  Analyse: { dot: 'status-working', label: 'WORKING' },
-  Veille: { dot: 'status-idle', label: 'IDLE' },
-  Sync: { dot: 'status-working', label: 'SYNC' },
+  active: { dot: 'status-active', label: 'ACTIVE' },
+  working: { dot: 'status-working', label: 'WORKING' },
+  idle: { dot: 'status-idle', label: 'IDLE' },
+  sync: { dot: 'status-working', label: 'SYNC' },
 };
 
 export default function StagePage() {
   const [isPaused, setIsPaused] = useState(false);
   const [activeTab, setActiveTab] = useState('feed');
-  const [eventCount, setEventCount] = useState(200);
-  const [nextRefresh, setNextRefresh] = useState(39);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [agentStats, setAgentStats] = useState<AgentStats[]>([]);
+  const [missionCount, setMissionCount] = useState({ completed: 0, total: 0 });
+  const [nextRefresh, setNextRefresh] = useState(30);
   const [cursorVisible, setCursorVisible] = useState(true);
   const [now, setNow] = useState<Date | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    // Fetch recent events
+    const { data: eventsData } = await supabase
+      .from('ops_agent_events')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(30);
+    
+    setEvents(eventsData || []);
+
+    // Fetch agent stats
+    const { data: statsData } = await supabase
+      .from('ops_agent_stats')
+      .select('*');
+    
+    setAgentStats(statsData || []);
+
+    // Fetch mission counts
+    const { count: completedCount } = await supabase
+      .from('ops_missions')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'completed');
+
+    const { count: totalCount } = await supabase
+      .from('ops_missions')
+      .select('*', { count: 'exact', head: true });
+
+    setMissionCount({
+      completed: completedCount || 0,
+      total: totalCount || 10
+    });
+
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
+    fetchData();
     setNow(new Date());
-  }, []);
+
+    // Subscribe to realtime events
+    const channel = supabase
+      .channel('stage-events')
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'ops_agent_events' }, 
+        (payload) => {
+          setEvents(prev => [payload.new as Event, ...prev.slice(0, 29)]);
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchData]);
 
   useEffect(() => {
     if (isPaused) return;
     const interval = setInterval(() => {
-      setNextRefresh(prev => prev <= 0 ? 60 : prev - 1);
-      if (nextRefresh <= 0) {
-        setEventCount(prev => prev + Math.floor(Math.random() * 5) + 1);
-      }
+      setNextRefresh(prev => {
+        if (prev <= 0) {
+          fetchData();
+          setNow(new Date());
+          return 30;
+        }
+        return prev - 1;
+      });
     }, 1000);
     return () => clearInterval(interval);
-  }, [isPaused, nextRefresh]);
+  }, [isPaused, fetchData]);
 
   // Blinking cursor
   useEffect(() => {
@@ -83,55 +145,124 @@ export default function StagePage() {
     return () => clearInterval(blink);
   }, []);
 
-  const getEventTypeColor = (type: string) => {
-    switch (type) {
-      case 'think': return 'text-hacker-purple';
-      case 'pulse': return 'text-hacker-green';
+  const getAgentName = (agentId: string) => agentNameMap[agentId] || agentId.toUpperCase();
+  const getAgentColor = (agentId: string) => agentColors[agentId] || '#00ff41';
+  const getAgentEmoji = (agentId: string) => AGENTS[agentId as AgentId]?.emoji || '🤖';
+
+  const getAgentStatus = (agentId: string) => {
+    const recentEvent = events.find(e => e.agent_id === agentId);
+    if (!recentEvent) return 'idle';
+    
+    const minutesAgo = (Date.now() - new Date(recentEvent.created_at).getTime()) / 60000;
+    if (minutesAgo < 5) return 'active';
+    if (minutesAgo < 15) return 'working';
+    return 'idle';
+  };
+
+  const getEventTypeColor = (kind: string) => {
+    switch (kind) {
+      case 'thought':
+      case 'insight': return 'text-hacker-purple';
+      case 'pulse':
+      case 'heartbeat': return 'text-hacker-green';
+      case 'conversation':
       case 'chat': return 'text-hacker-cyan';
-      case 'mission': return 'text-hacker-amber';
+      case 'mission':
+      case 'mission_complete': return 'text-hacker-amber';
+      case 'error': return 'text-hacker-red';
       default: return 'text-hacker-text';
     }
   };
 
-  const getEventTypeLabel = (type: string) => {
-    switch (type) {
-      case 'think': return 'THINK';
-      case 'pulse': return 'PULSE';
+  const getEventTypeLabel = (kind: string) => {
+    switch (kind) {
+      case 'thought':
+      case 'insight': return 'THINK';
+      case 'pulse':
+      case 'heartbeat': return 'PULSE';
+      case 'conversation':
       case 'chat': return 'CHAT';
-      case 'mission': return 'MISSION';
-      default: return 'EVENT';
+      case 'mission':
+      case 'mission_complete': return 'MISSION';
+      case 'error': return 'ERROR';
+      default: return kind.toUpperCase();
     }
   };
 
-  const getEventIcon = (type: string) => {
-    switch (type) {
-      case 'think': return <Brain className="w-3.5 h-3.5" />;
-      case 'pulse': return <Zap className="w-3.5 h-3.5" />;
+  const getEventIcon = (kind: string) => {
+    switch (kind) {
+      case 'thought':
+      case 'insight': return <Brain className="w-3.5 h-3.5" />;
+      case 'pulse':
+      case 'heartbeat': return <Zap className="w-3.5 h-3.5" />;
+      case 'conversation':
       case 'chat': return <MessageSquare className="w-3.5 h-3.5" />;
-      case 'mission': return <Rocket className="w-3.5 h-3.5" />;
+      case 'mission':
+      case 'mission_complete': return <Rocket className="w-3.5 h-3.5" />;
       default: return <Activity className="w-3.5 h-3.5" />;
     }
   };
 
-  const getAgentIcon = (name: string) => {
-    switch (name) {
-      case 'CEO': return <Terminal className="w-3.5 h-3.5" />;
-      case 'KIRA': return <Brain className="w-3.5 h-3.5" />;
-      case 'MADARA': return <Search className="w-3.5 h-3.5" />;
-      case 'STARK': return <PenTool className="w-3.5 h-3.5" />;
-      case 'L': return <Megaphone className="w-3.5 h-3.5" />;
-      case 'USOPP': return <Eye className="w-3.5 h-3.5" />;
+  const getAgentIcon = (agentId: string) => {
+    switch (agentId) {
+      case 'opus': return <Terminal className="w-3.5 h-3.5" />;
+      case 'brain': return <Brain className="w-3.5 h-3.5" />;
+      case 'growth': return <Search className="w-3.5 h-3.5" />;
+      case 'creator': return <PenTool className="w-3.5 h-3.5" />;
+      case 'twitter-alt': return <Megaphone className="w-3.5 h-3.5" />;
+      case 'company-observer': return <Eye className="w-3.5 h-3.5" />;
       default: return <Activity className="w-3.5 h-3.5" />;
     }
   };
 
-  // ASCII progress bar
-  const missionProgress = 1;
-  const missionTotal = 10;
-  const progressPercent = Math.round((missionProgress / missionTotal) * 100);
+  const formatTimeAgo = (date: string) => {
+    const minutes = Math.floor((Date.now() - new Date(date).getTime()) / 60000);
+    if (minutes < 1) return 'à l\'instant';
+    if (minutes < 60) return `il y a ${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `il y a ${hours}h`;
+    return `il y a ${Math.floor(hours / 24)}j`;
+  };
+
+  // Mission progress bar
+  const progressPercent = missionCount.total > 0 
+    ? Math.round((missionCount.completed / missionCount.total) * 100) 
+    : 0;
   const barLength = 20;
-  const filled = Math.round((missionProgress / missionTotal) * barLength);
-  const progressBar = '\u2588'.repeat(filled) + '\u2591'.repeat(barLength - filled);
+  const filled = Math.round((progressPercent / 100) * barLength);
+  const progressBar = '█'.repeat(filled) + '░'.repeat(barLength - filled);
+
+  // Get agents with their stats
+  const agentsWithStats = Object.entries(AGENTS).map(([id, agent]) => {
+    const stats = agentStats.find(s => s.agent_id === id);
+    const status = getAgentStatus(id);
+    const lastEvent = events.find(e => e.agent_id === id);
+    
+    return {
+      id,
+      name: agentNameMap[id] || agent.name,
+      emoji: agent.emoji,
+      status,
+      thought: lastEvent?.summary || lastEvent?.title || 'En attente...',
+      level: stats?.level || 1,
+      xp: stats?.xp || 0,
+    };
+  });
+
+  const activeCount = agentsWithStats.filter(a => a.status === 'active').length;
+  const workingCount = agentsWithStats.filter(a => a.status === 'working').length;
+  const idleCount = agentsWithStats.filter(a => a.status === 'idle').length;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-hacker-bg bg-grid flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-hacker-green border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-hacker-green font-mono text-sm">// chargement du stage...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-hacker-bg bg-grid">
@@ -151,7 +282,7 @@ export default function StagePage() {
                 {nextRefresh}s
               </span>
               <span className="text-hacker-muted-light">|</span>
-              <span>{eventCount} événements</span>
+              <span>{events.length} événements</span>
               <span className="text-hacker-muted-light">|</span>
               <span>{now ? now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--'}</span>
             </div>
@@ -164,6 +295,14 @@ export default function StagePage() {
             >
               {isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
               {isPaused ? 'RESUME' : 'PAUSE'}
+            </button>
+
+            <button
+              onClick={() => { fetchData(); setNextRefresh(30); }}
+              className="btn-secondary flex items-center gap-1.5 py-1.5 px-3 text-xs font-mono"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              REFRESH
             </button>
 
             {/* Terminal-style tabs */}
@@ -213,11 +352,11 @@ export default function StagePage() {
             {/* Room Footer - Status bar */}
             <div className="flex items-center justify-between px-4 py-2 bg-hacker-terminal border-t border-hacker-border font-mono text-[10px] text-hacker-muted">
               <span>
-                <span className="text-hacker-green">●</span> {agents.filter(a => a.status === 'Actif').length} actifs
+                <span className="text-hacker-green">●</span> {activeCount} actifs
                 <span className="mx-2 text-hacker-border">|</span>
-                <span className="text-hacker-amber">●</span> {agents.filter(a => ['Analyse', 'Sync'].includes(a.status)).length} en cours
+                <span className="text-hacker-amber">●</span> {workingCount} en cours
                 <span className="mx-2 text-hacker-border">|</span>
-                <span className="text-hacker-muted-light">●</span> {agents.filter(a => a.status === 'Veille').length} inactifs
+                <span className="text-hacker-muted-light">●</span> {idleCount} inactifs
               </span>
               <span className="text-hacker-green/50">glisser pour tourner // scroll pour zoomer // survoler les agents</span>
             </div>
@@ -230,14 +369,14 @@ export default function StagePage() {
         <div className="flex items-center gap-2 mb-3">
           <span className="font-mono text-sm text-hacker-green">// agent_monitoring</span>
           <span className="font-mono text-xs text-hacker-muted">
-            {agents.filter(a => a.status !== 'Veille').length}/{agents.length} actifs
+            {activeCount + workingCount}/{agentsWithStats.length} actifs
           </span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {agents.map((agent) => {
-            const color = agentColors[agent.name] || '#00ff41';
-            const statusInfo = statusMap[agent.status] || statusMap['Veille'];
-            const isActive = agent.status !== 'Veille';
+          {agentsWithStats.map((agent) => {
+            const color = getAgentColor(agent.id);
+            const statusInfo = statusMap[agent.status] || statusMap['idle'];
+            const isActive = agent.status !== 'idle';
 
             return (
               <div
@@ -250,29 +389,32 @@ export default function StagePage() {
                   <div className="flex items-center gap-2">
                     <span className={`status-dot ${statusInfo.dot}`} />
                     <span className="font-mono text-xs font-bold" style={{ color }}>
-                      {agent.name.toUpperCase()}
+                      {agent.name}
                     </span>
                     <span className="text-hacker-muted font-mono text-[10px]">
-                      PID:{agent.id.slice(0, 4)}
+                      LV.{agent.level}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="badge badge-muted text-[10px] font-mono">{statusInfo.label}</span>
                     <span style={{ color }} className="opacity-70">
-                      {getAgentIcon(agent.name)}
+                      {getAgentIcon(agent.id)}
                     </span>
                   </div>
                 </div>
 
                 {/* Terminal body */}
                 <div className="px-3 py-2.5 bg-hacker-bg/50 min-h-[72px] flex flex-col justify-between">
-                  <div className="font-mono text-xs text-hacker-text leading-relaxed">
-                    <span className="text-hacker-muted select-none">{'>'}_ </span>
+                  <div className="font-mono text-xs text-hacker-text leading-relaxed line-clamp-2">
+                    <span className="text-hacker-muted select-none">{'>'}_  </span>
                     {agent.thought}
                   </div>
                   <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-hacker-border/50">
                     <span className="font-mono text-[10px] text-hacker-muted">
-                      dernier: {mockEvents.find(e => e.agent === agent.name)?.time || 'n/a'}
+                      {events.find(e => e.agent_id === agent.id)
+                        ? formatTimeAgo(events.find(e => e.agent_id === agent.id)!.created_at)
+                        : 'n/a'
+                      }
                     </span>
                     {isActive && (
                       <span className="flex items-center gap-1">
@@ -295,19 +437,17 @@ export default function StagePage() {
             <span className="font-mono text-sm text-hacker-green">// mission_progress</span>
           </div>
           <div className="font-mono text-sm overflow-x-auto">
-            <span className="text-hacker-amber">MISSION {missionProgress}/{missionTotal}</span>
+            <span className="text-hacker-amber">MISSIONS {missionCount.completed}/{missionCount.total}</span>
             <span className="text-hacker-muted mx-3">[</span>
             <span className="text-hacker-green">{progressBar}</span>
             <span className="text-hacker-muted">]</span>
             <span className="text-hacker-text ml-3">{progressPercent}%</span>
           </div>
           <div className="flex items-center gap-4 mt-2 font-mono text-xs text-hacker-muted">
-            <span>cible: Heartbeat pulse</span>
-            <span className="text-hacker-muted-light">|</span>
-            <span>écoulé: 44m</span>
+            <span>dernière sync: {now?.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
             <span className="text-hacker-muted-light">|</span>
             <span>
-              status: <span className="text-hacker-green">IN_PROGRESS</span>
+              status: <span className="text-hacker-green">LIVE</span>
             </span>
           </div>
         </div>
@@ -320,19 +460,19 @@ export default function StagePage() {
             <span className="text-hacker-green">// stats</span>
             <span className="badge badge-muted">
               <BarChart3 className="w-3 h-3 inline mr-1" />
-              4 insights
+              {events.filter(e => e.kind === 'insight').length} insights
             </span>
             <span className="badge badge-muted">
               <Search className="w-3 h-3 inline mr-1" />
-              10 radar
+              {events.filter(e => e.kind === 'mission' || e.kind === 'mission_complete').length} missions
             </span>
             <span className="badge badge-muted">
               <PenTool className="w-3 h-3 inline mr-1" />
-              5 brouillons
+              {events.filter(e => e.kind === 'conversation' || e.kind === 'chat').length} conversations
             </span>
             <span className="ml-auto text-hacker-muted flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-hacker-muted animate-pulse" />
-              EN ATTENTE...
+              <span className="w-1.5 h-1.5 rounded-full bg-hacker-green animate-pulse" />
+              SUPABASE REALTIME
             </span>
           </div>
         </div>
@@ -342,7 +482,7 @@ export default function StagePage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
         <div className="flex items-center gap-2 mb-3">
           <span className="font-mono text-sm text-hacker-green">// live_event_feed</span>
-          <span className="font-mono text-xs text-hacker-muted">{mockEvents.length} entrées</span>
+          <span className="font-mono text-xs text-hacker-muted">{events.length} entrées</span>
         </div>
 
         <div className="terminal">
@@ -350,85 +490,78 @@ export default function StagePage() {
             <div className="terminal-dot" style={{ background: '#ff5f57' }} />
             <div className="terminal-dot" style={{ background: '#febc2e' }} />
             <div className="terminal-dot" style={{ background: '#28c840' }} />
-            <span className="ml-3 text-hacker-muted text-xs font-mono">events.log -- {eventCount} total</span>
+            <span className="ml-3 text-hacker-muted text-xs font-mono">tail -f /var/log/events.log</span>
           </div>
 
           <div className="terminal-body p-0">
             <div className="p-4 space-y-0 max-h-[520px] overflow-y-auto">
-              {mockEvents.map((event) => {
-                const typeColor = getEventTypeColor(event.type);
-                const agentColor = agentColors[event.agent] || '#c9d1d9';
+              {events.length === 0 ? (
+                <div className="text-center py-12">
+                  <Activity className="w-12 h-12 text-hacker-muted mx-auto mb-4" />
+                  <p className="text-hacker-muted font-mono text-sm">// aucun événement récent</p>
+                  <p className="text-hacker-muted-light text-xs mt-2">Les agents sont au repos</p>
+                </div>
+              ) : (
+                events.map((event) => {
+                  const typeColor = getEventTypeColor(event.kind);
+                  const agentColor = getAgentColor(event.agent_id);
+                  const agentName = getAgentName(event.agent_id);
 
-                return (
-                  <div
-                    key={event.id}
-                    className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-0 py-2 border-b border-hacker-border/30 last:border-b-0 font-mono text-xs hover:bg-hacker-green/[0.03] transition-colors"
-                  >
-                    {/* Mobile: meta row (timestamp + agent + type) */}
-                    <div className="flex items-center gap-2 sm:contents">
-                      {/* Timestamp */}
-                      <span className="text-hacker-muted sm:w-24 flex-shrink-0 text-[11px]">{event.time}</span>
+                  return (
+                    <div
+                      key={event.id}
+                      className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-0 py-2 border-b border-hacker-border/30 last:border-b-0 font-mono text-xs hover:bg-hacker-green/[0.03] transition-colors"
+                    >
+                      {/* Mobile: meta row (timestamp + agent + type) */}
+                      <div className="flex items-center gap-2 sm:contents">
+                        {/* Timestamp */}
+                        <span className="text-hacker-muted sm:w-24 flex-shrink-0 text-[11px]">
+                          {formatTimeAgo(event.created_at)}
+                        </span>
+
+                        {/* Separator - desktop only */}
+                        <span className="text-hacker-border mx-1 flex-shrink-0 hidden sm:inline">|</span>
+
+                        {/* Agent name */}
+                        <span
+                          className="sm:w-20 flex-shrink-0 font-bold text-[11px]"
+                          style={{ color: agentColor }}
+                        >
+                          {agentName}
+                        </span>
+
+                        {/* Separator - desktop only */}
+                        <span className="text-hacker-border mx-1 flex-shrink-0 hidden sm:inline">|</span>
+
+                        {/* Event type icon + badge */}
+                        <span className={`flex items-center gap-1 sm:w-20 flex-shrink-0 ${typeColor}`}>
+                          {getEventIcon(event.kind)}
+                          <span className="text-[10px] uppercase">{getEventTypeLabel(event.kind)}</span>
+                        </span>
+                      </div>
 
                       {/* Separator - desktop only */}
                       <span className="text-hacker-border mx-1 flex-shrink-0 hidden sm:inline">|</span>
 
-                      {/* Agent name */}
-                      <span
-                        className="sm:w-20 flex-shrink-0 font-bold text-[11px]"
-                        style={{ color: agentColor }}
-                      >
-                        {event.agent}
-                      </span>
-
-                      {/* Separator - desktop only */}
-                      <span className="text-hacker-border mx-1 flex-shrink-0 hidden sm:inline">|</span>
-
-                      {/* Event type icon + badge */}
-                      <span className={`flex items-center gap-1 sm:w-20 flex-shrink-0 ${typeColor}`}>
-                        {getEventIcon(event.type)}
-                        <span className="text-[10px] uppercase">{getEventTypeLabel(event.type)}</span>
-                      </span>
+                      {/* Content */}
+                      <div className={`flex-1 text-[11px] leading-relaxed ${typeColor} pl-0 sm:pl-0`}>
+                        <span>{event.title || event.summary || 'Événement'}</span>
+                        {event.summary && event.title && (
+                          <span className="text-hacker-muted ml-2">// {event.summary}</span>
+                        )}
+                      </div>
                     </div>
-
-                    {/* Separator - desktop only */}
-                    <span className="text-hacker-border mx-1 flex-shrink-0 hidden sm:inline">|</span>
-
-                    {/* Content */}
-                    <div className={`flex-1 text-[11px] leading-relaxed ${typeColor} pl-0 sm:pl-0`}>
-                      {event.type === 'think' && (
-                        <span>{event.agent} pense : {event.content}</span>
-                      )}
-                      {event.type === 'pulse' && (
-                        <span>{event.content}</span>
-                      )}
-                      {event.type === 'chat' && (
-                        <span>
-                          {event.replyTo && (
-                            <span className="text-hacker-muted">{'->'} {event.replyTo}: </span>
-                          )}
-                          {event.content}
-                        </span>
-                      )}
-                      {event.type === 'mission' && (
-                        <span>
-                          {event.content}
-                          {event.meta && (
-                            <span className="text-hacker-muted ml-2">// {event.meta}</span>
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
 
               {/* Listening indicator */}
               <div className="flex items-center gap-2 pt-4 mt-2 border-t border-hacker-border">
                 <span className="text-hacker-green text-sm" style={{ opacity: cursorVisible ? 1 : 0 }}>
-                  {'\u2588'}
+                  █
                 </span>
                 <span className="font-mono text-xs text-hacker-green/70 tracking-wider">
-                  écoute...
+                  écoute Supabase realtime...
                 </span>
               </div>
             </div>

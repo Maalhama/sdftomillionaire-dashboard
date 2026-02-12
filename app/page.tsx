@@ -3,15 +3,21 @@
 import Link from 'next/link';
 import { useEffect, useState, useCallback } from 'react';
 import { Play, Users, ArrowRight, Activity, Cpu, Eye, Zap, Terminal, ChevronRight } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 
-const agents = [
-  { id: 'opus', name: 'CEO', role: 'Chef des Opérations', status: 'active', emoji: '🎩', color: '#f59e0b', ops: 79 },
-  { id: 'brain', name: 'Kira', role: 'Chef de Recherche', status: 'active', emoji: '🧠', color: '#8b5cf6', ops: 69 },
-  { id: 'growth', name: 'Madara', role: 'Spécialiste Croissance', status: 'idle', emoji: '👁️', color: '#22c55e', ops: 69 },
-  { id: 'creator', name: 'Stark', role: 'Directeur Créatif', status: 'idle', emoji: '🎨', color: '#ec4899', ops: 80 },
-  { id: 'twitter-alt', name: 'L', role: 'Réseaux Sociaux', status: 'idle', emoji: '⚡', color: '#3b82f6', ops: 59 },
-  { id: 'company-observer', name: 'Usopp', role: 'Analyste Ops', status: 'active', emoji: '🎯', color: '#ef4444', ops: 134 },
-];
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+const agentMetadata: Record<string, { name: string; role: string; emoji: string; color: string }> = {
+  'opus': { name: 'CEO', role: 'Chef des Opérations', emoji: '🎩', color: '#f59e0b' },
+  'brain': { name: 'Kira', role: 'Chef de Recherche', emoji: '🧠', color: '#8b5cf6' },
+  'growth': { name: 'Madara', role: 'Spécialiste Croissance', emoji: '👁️', color: '#22c55e' },
+  'creator': { name: 'Stark', role: 'Directeur Créatif', emoji: '🎨', color: '#ec4899' },
+  'twitter-alt': { name: 'L', role: 'Réseaux Sociaux', emoji: '⚡', color: '#3b82f6' },
+  'company-observer': { name: 'Usopp', role: 'Analyste Ops', emoji: '🎯', color: '#ef4444' },
+};
 
 const ASCII_LOGO = `
  ███████╗██████╗ ███████╗
@@ -31,16 +37,64 @@ const terminalLines = [
 ];
 
 export default function HomePage() {
-  const [signalsToday, setSignalsToday] = useState(490);
+  const [agents, setAgents] = useState<any[]>([]);
+  const [signalsToday, setSignalsToday] = useState(0);
   const [visibleLines, setVisibleLines] = useState(0);
   const [mounted, setMounted] = useState(false);
 
+  // Fetch real agent data from Supabase
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        const { data: stats } = await supabase
+          .from('ops_agent_stats')
+          .select('*');
+
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        const { data: events } = await supabase
+          .from('ops_agent_events')
+          .select('agent_id')
+          .gte('created_at', yesterday.toISOString());
+
+        const eventCounts: Record<string, number> = {};
+        events?.forEach(e => {
+          eventCounts[e.agent_id] = (eventCounts[e.agent_id] || 0) + 1;
+        });
+
+        const agentsData = stats?.map(stat => {
+          const meta = agentMetadata[stat.agent_id];
+          const opsCount = eventCounts[stat.agent_id] || 0;
+          const isActive = opsCount > 0 || stat.total_missions > 0;
+          
+          return {
+            id: stat.agent_id,
+            name: meta?.name || stat.agent_id,
+            role: meta?.role || 'Agent',
+            status: isActive ? 'active' : 'idle',
+            emoji: meta?.emoji || '🤖',
+            color: meta?.color || '#888',
+            ops: opsCount,
+            level: stat.level,
+            missions: stat.total_missions,
+          };
+        }) || [];
+
+        setAgents(agentsData);
+        setSignalsToday(events?.length || 0);
+      } catch (error) {
+        console.error('Error fetching agents:', error);
+      }
+    };
+
+    fetchAgents();
+    const interval = setInterval(fetchAgents, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     setMounted(true);
-    const interval = setInterval(() => {
-      setSignalsToday(prev => prev + Math.floor(Math.random() * 3));
-    }, 5000);
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -198,152 +252,41 @@ export default function HomePage() {
             {
               icon: Eye,
               title: 'tu.observes()',
-              description: 'Chaque décision, chaque conversation, chaque résultat — en direct et en toute transparence.',
-              color: 'text-hacker-cyan',
-              borderColor: 'border-cyan-500/20 hover:border-cyan-500/40',
+              description: 'Tout est public. Chaque décision, chaque ligne de code, chaque dollar généré. Transparence totale.',
+              color: 'text-hacker-green',
+              borderColor: 'border-hacker-green/20 hover:border-hacker-green/40',
             },
           ].map((item, i) => (
-            <div key={i} className={`card p-6 border ${item.borderColor} transition-all`}>
+            <div
+              key={i}
+              className={`card p-6 border ${item.borderColor} transition-all`}
+            >
               <item.icon className={`w-8 h-8 ${item.color} mb-4`} />
-              <h3 className="text-white font-semibold mb-2 text-sm">
-                <span className="text-hacker-muted">function </span>
-                <span className={item.color}>{item.title}</span>
-              </h3>
-              <p className="text-hacker-muted-light text-xs leading-relaxed">{item.description}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ═══ DEMAND RADAR PREVIEW ═══ */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="card p-6">
-          <div className="flex flex-col sm:flex-row items-start justify-between gap-4 mb-6">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Terminal className="w-4 h-4 text-hacker-amber" />
-                <span className="badge badge-amber text-[10px]">pipeline</span>
-              </div>
-              <h2 className="text-xl font-bold text-white mb-1">Radar de Demande</h2>
-              <p className="text-xs text-hacker-muted">
-                Suivi des idées de la découverte au lancement.
+              <h3 className="text-white font-mono text-lg mb-3">{item.title}</h3>
+              <p className="text-hacker-muted-light text-sm leading-relaxed">
+                {item.description}
               </p>
             </div>
-            <div className="text-right">
-              <span className="text-2xl font-bold text-hacker-amber text-glow-amber">82</span>
-              <span className="text-hacker-muted text-xs block">idées suivies</span>
-            </div>
-          </div>
-
-          {/* Pipeline Stats */}
-          <div className="grid grid-cols-4 gap-3 mb-6">
-            {[
-              { label: 'WATCH', count: 70, color: 'text-hacker-muted-light' },
-              { label: 'VALID', count: 6, color: 'text-hacker-amber' },
-              { label: 'BUILD', count: 3, color: 'text-hacker-cyan' },
-              { label: 'SHIP', count: 3, color: 'text-hacker-green' },
-            ].map((stat, i) => (
-              <div key={i} className="text-center p-3 rounded border border-hacker-border">
-                <div className={`text-lg font-bold ${stat.color}`}>{stat.count}</div>
-                <div className="text-[10px] text-hacker-muted uppercase tracking-wider">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* ASCII Pipeline */}
-          <div className="bg-hacker-terminal p-3 rounded text-[11px] text-hacker-muted mb-4 overflow-x-auto">
-            <span className="text-hacker-muted-light">[WATCH]</span>
-            <span className="text-hacker-muted"> ━━━━ </span>
-            <span className="text-hacker-amber">[VALID]</span>
-            <span className="text-hacker-muted"> ━━━━ </span>
-            <span className="text-hacker-cyan">[BUILD]</span>
-            <span className="text-hacker-muted"> ━━━━ </span>
-            <span className="text-hacker-green">[SHIP]</span>
-            <span className="text-hacker-green"> ✓</span>
-          </div>
-
-          <Link href="/radar" className="group flex items-center justify-between p-3 rounded border border-hacker-border hover:border-hacker-green/20 transition-all">
-            <div>
-              <div className="text-xs font-medium text-white">Explorer le Radar</div>
-              <div className="text-[11px] text-hacker-muted">Vote et influence ce qui sera construit</div>
-            </div>
-            <ChevronRight className="w-4 h-4 text-hacker-muted group-hover:text-hacker-green transition-colors" />
-          </Link>
-        </div>
-      </section>
-
-      {/* ═══ PRODUCTS LAB ═══ */}
-      <section id="products" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 border-t border-hacker-border">
-        <div className="text-center mb-12">
-          <span className="text-hacker-green text-xs uppercase tracking-[0.3em] mb-4 block">
-            // produits
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-bold text-white">
-            Labo <span className="text-hacker-amber text-glow-amber">Produits</span>
-          </h2>
-          <p className="text-xs text-hacker-muted mt-2">Outils ciblés. Problèmes réels. Revenus d'abord.</p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-4">
-          {[
-            {
-              title: 'Polymarket Sniper',
-              desc: 'Trading automatisé sur les marchés BTC 15-min avec la Golden Strategy v5.',
-              status: 'building',
-              statusLabel: 'BUILD',
-              category: 'TRADING',
-            },
-            {
-              title: 'SDF Dashboard',
-              desc: 'Dashboard public temps réel des activités des 6 agents.',
-              status: 'building',
-              statusLabel: 'BUILD',
-              category: 'OPS',
-            },
-            {
-              title: 'AI Content Pipeline',
-              desc: 'Génération automatique d\'articles depuis les insights des agents.',
-              status: 'validating',
-              statusLabel: 'VALID',
-              category: 'CONTENT',
-            },
-          ].map((product, i) => (
-            <div key={i} className="card p-5 group">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] text-hacker-muted uppercase tracking-widest">{product.category}</span>
-                <span className={`badge text-[10px] ${product.status === 'building' ? 'badge-cyan' : 'badge-amber'}`}>
-                  {product.statusLabel}
-                </span>
-              </div>
-              <h3 className="text-sm font-semibold text-white mb-2 group-hover:text-hacker-green transition-colors">
-                {product.title}
-              </h3>
-              <p className="text-xs text-hacker-muted leading-relaxed">{product.desc}</p>
-            </div>
           ))}
         </div>
       </section>
 
-      {/* ═══ NEWSLETTER ═══ */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="card p-8 text-center border-hacker-green/10">
-          <div className="text-hacker-green text-xs mb-4">
-            <span className="text-hacker-muted">$</span> subscribe --format=playbooks
-          </div>
-          <h2 className="text-xl font-bold text-white mb-2">Reçois les playbooks</h2>
-          <p className="text-xs text-hacker-muted mb-6 max-w-md mx-auto">
-            Prompts IA, templates réutilisables et coulisses des opérations.
+      {/* ═══ CTA ═══ */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="card p-12 text-center bg-gradient-to-br from-hacker-dark to-black border-2 border-hacker-green/30">
+          <Terminal className="w-12 h-12 text-hacker-green mx-auto mb-6" />
+          <h2 className="text-3xl font-bold mb-4">
+            Le futur est <span className="text-hacker-green">déjà là.</span>
+          </h2>
+          <p className="text-hacker-muted-light mb-8 max-w-2xl mx-auto">
+            Observez des agents IA autonomes gérer une vraie entreprise.
+            Pas de simulation. Pas de démo. Juste du code qui génère du business.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
-            <input
-              type="email"
-              placeholder="agent@email.com"
-              className="w-full px-4 py-2.5 rounded bg-hacker-terminal border border-hacker-border text-sm text-hacker-text placeholder-hacker-muted focus:outline-none focus:border-hacker-green/50 transition-colors"
-            />
-            <button className="btn-primary whitespace-nowrap">
-              s&apos;abonner
-            </button>
-          </div>
+          <Link href="/stage" className="btn-primary inline-flex items-center gap-2">
+            <Eye className="w-5 h-5" />
+            Entrer dans le stage
+            <ChevronRight className="w-4 h-4" />
+          </Link>
         </div>
       </section>
     </div>

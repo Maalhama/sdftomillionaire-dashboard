@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase, AGENTS, AgentId } from '@/lib/supabase';
+import { Activity, Brain, Users, Zap, Trophy, TrendingUp } from 'lucide-react';
 
 interface AgentStats {
   agent_id: string;
@@ -23,18 +24,56 @@ interface Relationship {
   total_interactions: number;
 }
 
+interface Memory {
+  id: string;
+  agent_id: string;
+  memory_type: string;
+  content: string;
+  confidence: number;
+  created_at: string;
+}
+
+const agentColors: Record<string, string> = {
+  opus: '#f59e0b',
+  brain: '#8b5cf6',
+  growth: '#22c55e',
+  creator: '#ec4899',
+  'twitter-alt': '#3b82f6',
+  'company-observer': '#ef4444',
+};
+
+function buildAsciiBar(value: number, max: number = 100): string {
+  const filled = Math.round((value / max) * 15);
+  const empty = 15 - filled;
+  return '█'.repeat(filled) + '░'.repeat(empty);
+}
+
 export default function AgentsPage() {
   const [selectedAgent, setSelectedAgent] = useState<AgentId | null>('opus');
   const [relationships, setRelationships] = useState<Relationship[]>([]);
-  const [memories, setMemories] = useState<any[]>([]);
+  const [memories, setMemories] = useState<Memory[]>([]);
   const [stats, setStats] = useState<AgentStats | null>(null);
+  const [allStats, setAllStats] = useState<AgentStats[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchData();
+    fetchAllStats();
+  }, []);
+
+  useEffect(() => {
+    if (selectedAgent) {
+      fetchAgentData();
+    }
   }, [selectedAgent]);
 
-  async function fetchData() {
+  async function fetchAllStats() {
+    const { data } = await supabase
+      .from('ops_agent_stats')
+      .select('*');
+    setAllStats(data || []);
+  }
+
+  async function fetchAgentData() {
     setLoading(true);
     
     // Fetch relationships
@@ -55,183 +94,311 @@ export default function AgentsPage() {
     setStats(agentStats);
     
     // Fetch memories for selected agent
-    if (selectedAgent) {
-      const { data: mems } = await supabase
-        .from('ops_agent_memory')
-        .select('*')
-        .eq('agent_id', selectedAgent)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      
-      setMemories(mems || []);
-    }
+    const { data: mems } = await supabase
+      .from('ops_agent_memory')
+      .select('*')
+      .eq('agent_id', selectedAgent)
+      .order('created_at', { ascending: false })
+      .limit(5);
     
+    setMemories(mems || []);
     setLoading(false);
   }
 
   const agent = selectedAgent ? AGENTS[selectedAgent] : null;
+  const color = selectedAgent ? agentColors[selectedAgent] : '#00ff41';
+
+  const getAgentStats = (agentId: string) => {
+    return allStats.find(s => s.agent_id === agentId);
+  };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Agents</h1>
-      
-      {/* Agent Grid */}
-      <div className="grid grid-cols-6 gap-3">
-        {Object.entries(AGENTS).map(([id, agentInfo]) => (
-          <button
-            key={id}
-            onClick={() => setSelectedAgent(id as AgentId)}
-            className={`p-4 rounded-xl border text-center transition ${
-              selectedAgent === id
-                ? 'bg-sdftomillionaire-accent/20 border-sdftomillionaire-accent'
-                : 'bg-sdftomillionaire-card border-sdftomillionaire-border hover:border-sdftomillionaire-accent/30'
-            }`}
-          >
-            <div 
-              className="w-14 h-14 mx-auto mb-2 rounded-xl flex items-center justify-center text-3xl"
-              style={{ backgroundColor: `${agentInfo.color}20` }}
-            >
-              {agentInfo.emoji}
-            </div>
-            <p className="font-semibold">{agentInfo.name}</p>
-            <p className="text-xs text-gray-500">{agentInfo.role}</p>
-          </button>
-        ))}
-      </div>
+    <div className="min-h-screen bg-hacker-bg bg-grid">
+      {/* ═══ HEADER ═══ */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-8">
+        <p className="text-hacker-green text-sm mb-2 font-mono">// agent_roster</p>
+        <div className="flex items-center gap-4 mb-4">
+          <h1 className="text-3xl md:text-4xl font-bold text-white">
+            Registre des Agents
+          </h1>
+          <span className="badge badge-live">LIVE</span>
+        </div>
+        <p className="text-hacker-muted-light max-w-2xl">
+          Statistiques en temps réel, relations inter-agents, et mémoires de chaque membre de l'équipe.
+        </p>
+      </section>
 
-      {agent && (
-        <div className="grid grid-cols-2 gap-6">
-          {/* Agent Details */}
-          <div className="bg-sdftomillionaire-card border border-sdftomillionaire-border rounded-xl p-6">
-            <div className="flex items-center gap-4 mb-6">
-              <div 
-                className="w-20 h-20 rounded-2xl flex items-center justify-center text-5xl"
-                style={{ backgroundColor: `${agent.color}20` }}
+      {/* ═══ AGENT GRID (Selectors) ═══ */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {Object.entries(AGENTS).map(([id, agentInfo]) => {
+            const agentStat = getAgentStats(id);
+            const isSelected = selectedAgent === id;
+            const agentColor = agentColors[id] || '#00ff41';
+            
+            return (
+              <button
+                key={id}
+                onClick={() => setSelectedAgent(id as AgentId)}
+                className={`card p-4 text-center transition-all duration-300 ${
+                  isSelected 
+                    ? 'border-2' 
+                    : 'hover:border-hacker-green/30'
+                }`}
+                style={{ 
+                  borderColor: isSelected ? agentColor : undefined,
+                  boxShadow: isSelected ? `0 0 20px ${agentColor}33` : undefined
+                }}
               >
-                {agent.emoji}
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold">{agent.name}</h2>
-                <p className="text-gray-500">{agent.role}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-xs text-gray-500">Active</span>
+                <div 
+                  className="w-14 h-14 mx-auto mb-2 rounded-xl flex items-center justify-center text-3xl border"
+                  style={{ 
+                    backgroundColor: `${agentColor}15`,
+                    borderColor: `${agentColor}40`
+                  }}
+                >
+                  {agentInfo.emoji}
                 </div>
-              </div>
-            </div>
-
-            {/* RPG Stats */}
-            {stats && (
-              <div className="mb-6 p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-xl border border-purple-500/20">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <span className="text-3xl font-bold">Lvl {stats.level}</span>
-                    <span className="text-gray-500 ml-2">{stats.xp} XP</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm text-gray-400">Streak</div>
-                    <div className="text-xl font-bold text-orange-400">🔥 {stats.current_streak || 0}</div>
-                  </div>
-                </div>
-                
-                {/* XP Bar */}
-                <div className="h-2 bg-sdftomillionaire-border rounded-full overflow-hidden mb-3">
-                  <div 
-                    className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
-                    style={{ width: `${Math.min(100, (stats.xp % 100))}%` }}
-                  ></div>
-                </div>
-                
-                {/* Stats Grid */}
-                <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                  <div className="bg-sdftomillionaire-dark/50 rounded-lg p-2">
-                    <div className="text-green-400 font-bold">{stats.missions_completed || 0}</div>
-                    <div className="text-gray-500 text-xs">Missions ✓</div>
-                  </div>
-                  <div className="bg-sdftomillionaire-dark/50 rounded-lg p-2">
-                    <div className="text-blue-400 font-bold">{stats.conversations_participated || 0}</div>
-                    <div className="text-gray-500 text-xs">Convos</div>
-                  </div>
-                  <div className="bg-sdftomillionaire-dark/50 rounded-lg p-2">
-                    <div className="text-yellow-400 font-bold">{stats.best_streak || 0}</div>
-                    <div className="text-gray-500 text-xs">Best Streak</div>
-                  </div>
-                </div>
-                
-                {/* Achievements */}
-                {stats.achievements && stats.achievements.length > 0 && (
-                  <div className="mt-3 flex gap-1 flex-wrap">
-                    {stats.achievements.map((a, i) => (
-                      <span key={i} className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded">
-                        🏆 {a}
-                      </span>
-                    ))}
+                <p className="font-bold text-sm" style={{ color: agentColor }}>{agentInfo.name}</p>
+                <p className="text-[10px] text-hacker-muted uppercase tracking-wider">{agentInfo.role}</p>
+                {agentStat && (
+                  <div className="mt-2 flex items-center justify-center gap-2 text-[10px]">
+                    <span className="text-hacker-purple">LV.{agentStat.level}</span>
+                    <span className="text-hacker-muted">|</span>
+                    <span className="text-hacker-amber">{agentStat.xp} XP</span>
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* Relationships */}
-            <h3 className="font-semibold mb-3">Relations</h3>
-            <div className="space-y-2">
-              {relationships.map((rel, i) => {
-                const otherAgentId = rel.agent_a === selectedAgent ? rel.agent_b : rel.agent_a;
-                const otherAgent = AGENTS[otherAgentId as AgentId];
-                if (!otherAgent) return null;
-                
-                const affinityColor = rel.affinity >= 0.7 ? 'bg-green-500' :
-                                      rel.affinity >= 0.4 ? 'bg-yellow-500' : 'bg-red-500';
-                
-                return (
-                  <div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-sdftomillionaire-dark/50">
-                    <span className="text-xl">{otherAgent.emoji}</span>
-                    <span className="flex-1 text-sm">{otherAgent.name}</span>
-                    <div className="w-24 h-2 bg-sdftomillionaire-border rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full ${affinityColor} transition-all`}
-                        style={{ width: `${rel.affinity * 100}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-xs text-gray-500 w-10 text-right">
-                      {Math.round(rel.affinity * 100)}%
-                    </span>
-                  </div>
-                );
-              })}
-              {relationships.length === 0 && (
-                <p className="text-gray-500 text-sm">Aucune relation enregistrée</p>
-              )}
-            </div>
-          </div>
-
-          {/* Memories */}
-          <div className="bg-sdftomillionaire-card border border-sdftomillionaire-border rounded-xl p-6">
-            <h3 className="font-semibold mb-4">Mémoires Récentes</h3>
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {memories.map((mem, i) => (
-                <div key={i} className="p-3 bg-sdftomillionaire-dark/50 rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                      mem.memory_type === 'insight' ? 'bg-purple-500/20 text-purple-400' :
-                      mem.memory_type === 'pattern' ? 'bg-blue-500/20 text-blue-400' :
-                      mem.memory_type === 'lesson' ? 'bg-green-500/20 text-green-400' :
-                      'bg-gray-500/20 text-gray-400'
-                    }`}>
-                      {mem.memory_type}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      {new Date(mem.created_at).toLocaleDateString('fr-FR')}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-300">{mem.content}</p>
-                </div>
-              ))}
-              {memories.length === 0 && (
-                <p className="text-gray-500 text-sm text-center py-4">Aucune mémoire enregistrée</p>
-              )}
-            </div>
-          </div>
+              </button>
+            );
+          })}
         </div>
+      </section>
+
+      {/* ═══ AGENT DETAIL TERMINAL ═══ */}
+      {agent && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+          <div className="terminal">
+            <div className="terminal-header">
+              <div className="terminal-dot red" />
+              <div className="terminal-dot yellow" />
+              <div className="terminal-dot green" />
+              <span className="ml-3 text-xs text-hacker-muted-light font-mono">
+                sdf@hq ~ cat /agents/{selectedAgent}/profile.json
+              </span>
+              <div className="ml-auto flex items-center gap-2">
+                <span className="badge badge-live text-[10px]">LIVE</span>
+              </div>
+            </div>
+
+            <div className="terminal-body !max-h-none p-0">
+              <div className="grid lg:grid-cols-3 lg:divide-x divide-y lg:divide-y-0 divide-hacker-border">
+                
+                {/* ── Left: Agent Identity & Stats ── */}
+                <div className="p-6 space-y-6">
+                  {/* Identity */}
+                  <div>
+                    <p className="text-[10px] text-hacker-muted uppercase tracking-widest mb-3">
+                      <span className="text-hacker-green">//</span> identité
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <div
+                        className="w-16 h-16 rounded-xl flex items-center justify-center text-3xl border-2"
+                        style={{ 
+                          borderColor: color, 
+                          boxShadow: `0 0 20px ${color}33`,
+                          backgroundColor: `${color}15`
+                        }}
+                      >
+                        {agent.emoji}
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold" style={{ color }}>
+                          {agent.name}
+                        </h2>
+                        <p className="text-xs text-hacker-muted-light uppercase tracking-wider">
+                          {agent.role}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="status-dot status-active" />
+                          <span className="text-[10px] text-hacker-green uppercase">ACTIF</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* RPG Stats */}
+                  {stats && (
+                    <div>
+                      <p className="text-[10px] text-hacker-muted uppercase tracking-widest mb-3">
+                        <span className="text-hacker-green">//</span> stats rpg
+                      </p>
+                      
+                      {/* Level & XP */}
+                      <div className="card-terminal p-4 mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-2xl font-bold text-hacker-purple">
+                            LV.{stats.level}
+                          </span>
+                          <span className="text-hacker-amber font-mono text-sm">
+                            {stats.xp} XP
+                          </span>
+                        </div>
+                        <div className="font-mono text-xs">
+                          <span className="text-hacker-muted">[</span>
+                          <span className="text-hacker-purple">{buildAsciiBar(stats.xp % 100)}</span>
+                          <span className="text-hacker-muted">]</span>
+                          <span className="text-hacker-muted-light ml-2">{stats.xp % 100}%</span>
+                        </div>
+                      </div>
+
+                      {/* Quick Stats */}
+                      <div className="grid grid-cols-3 gap-2 text-center font-mono text-xs">
+                        <div className="card-terminal p-2">
+                          <div className="text-hacker-green font-bold">{stats.missions_completed || 0}</div>
+                          <div className="text-hacker-muted text-[10px]">Missions ✓</div>
+                        </div>
+                        <div className="card-terminal p-2">
+                          <div className="text-hacker-cyan font-bold">{stats.conversations_participated || 0}</div>
+                          <div className="text-hacker-muted text-[10px]">Convos</div>
+                        </div>
+                        <div className="card-terminal p-2">
+                          <div className="text-hacker-amber font-bold">🔥 {stats.current_streak || 0}</div>
+                          <div className="text-hacker-muted text-[10px]">Streak</div>
+                        </div>
+                      </div>
+
+                      {/* Achievements */}
+                      {stats.achievements && stats.achievements.length > 0 && (
+                        <div className="mt-4">
+                          <p className="text-[10px] text-hacker-muted uppercase tracking-widest mb-2">
+                            <span className="text-hacker-amber">//</span> achievements
+                          </p>
+                          <div className="flex gap-1 flex-wrap">
+                            {stats.achievements.map((a, i) => (
+                              <span key={i} className="badge badge-amber text-[10px]">
+                                🏆 {a}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {loading && (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="w-6 h-6 border-2 border-hacker-green border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Center: Relations ── */}
+                <div className="p-6">
+                  <p className="text-[10px] text-hacker-muted uppercase tracking-widest mb-4">
+                    <span className="text-hacker-cyan">//</span> relations ({relationships.length})
+                  </p>
+                  
+                  <div className="space-y-3">
+                    {relationships.map((rel, i) => {
+                      const otherAgentId = rel.agent_a === selectedAgent ? rel.agent_b : rel.agent_a;
+                      const otherAgent = AGENTS[otherAgentId as AgentId];
+                      if (!otherAgent) return null;
+                      
+                      const otherColor = agentColors[otherAgentId] || '#888';
+                      const affinityPercent = Math.round(rel.affinity * 100);
+                      
+                      return (
+                        <div key={i} className="card-terminal p-3">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-xl">{otherAgent.emoji}</span>
+                            <span className="font-bold text-sm" style={{ color: otherColor }}>
+                              {otherAgent.name}
+                            </span>
+                            <span className="ml-auto text-xs font-mono" style={{ 
+                              color: affinityPercent >= 70 ? '#22c55e' : 
+                                     affinityPercent >= 40 ? '#ffb800' : '#ff3e3e' 
+                            }}>
+                              {affinityPercent}%
+                            </span>
+                          </div>
+                          <div className="font-mono text-xs">
+                            <span className="text-hacker-muted">[</span>
+                            <span style={{ 
+                              color: affinityPercent >= 70 ? '#22c55e' : 
+                                     affinityPercent >= 40 ? '#ffb800' : '#ff3e3e' 
+                            }}>
+                              {buildAsciiBar(affinityPercent)}
+                            </span>
+                            <span className="text-hacker-muted">]</span>
+                          </div>
+                          <div className="text-[10px] text-hacker-muted mt-1">
+                            {rel.total_interactions || 0} interactions
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {relationships.length === 0 && !loading && (
+                      <p className="text-hacker-muted text-sm text-center py-4 font-mono">
+                        // aucune relation enregistrée
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Right: Recent Memories ── */}
+                <div className="p-6">
+                  <p className="text-[10px] text-hacker-muted uppercase tracking-widest mb-4">
+                    <span className="text-hacker-purple">//</span> mémoires récentes
+                  </p>
+                  
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                    {memories.map((mem, i) => (
+                      <div key={i} className="card-terminal p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`badge text-[10px] ${
+                            mem.memory_type === 'insight' ? 'badge-purple' :
+                            mem.memory_type === 'pattern' ? 'badge-cyan' :
+                            mem.memory_type === 'lesson' ? 'badge-live' :
+                            mem.memory_type === 'strategy' ? 'badge-amber' :
+                            'badge-muted'
+                          }`}>
+                            {mem.memory_type}
+                          </span>
+                          <span className="text-[10px] text-hacker-muted">
+                            {new Date(mem.created_at).toLocaleDateString('fr-FR')}
+                          </span>
+                        </div>
+                        <p className="text-xs text-hacker-text leading-relaxed">
+                          {mem.content}
+                        </p>
+                      </div>
+                    ))}
+                    
+                    {memories.length === 0 && !loading && (
+                      <p className="text-hacker-muted text-sm text-center py-4 font-mono">
+                        // aucune mémoire enregistrée
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Terminal Footer */}
+            <div className="border-t border-hacker-border p-3 bg-hacker-terminal">
+              <div className="flex items-center justify-center gap-6 text-[10px] font-mono text-hacker-muted">
+                <span>
+                  <span className="text-hacker-green">●</span> Données live depuis Supabase
+                </span>
+                <span>|</span>
+                <span>Refresh: 30s</span>
+                <span>|</span>
+                <span>Agent: <span style={{ color }}>{agent.name}</span></span>
+              </div>
+            </div>
+          </div>
+        </section>
       )}
     </div>
   );
