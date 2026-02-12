@@ -3,12 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState, useCallback } from 'react';
 import { Play, Users, ArrowRight, Activity, Cpu, Eye, Zap, Terminal, ChevronRight } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from '@/lib/supabase';
 
 const agentMetadata: Record<string, { name: string; role: string; emoji: string; color: string }> = {
   'opus': { name: 'CEO', role: 'Chef des Opérations', emoji: '🎩', color: '#f59e0b' },
