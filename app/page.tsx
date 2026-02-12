@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState, useCallback } from 'react';
-import { Play, Users, ArrowRight, Activity, Cpu, Eye, Zap, Terminal, ChevronRight } from 'lucide-react';
+import { Play, Users, ArrowRight, Activity, Cpu, Eye, Zap, Terminal, ChevronRight, Send } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 const agentMetadata: Record<string, { name: string; role: string; emoji: string; avatar: string; color: string }> = {
@@ -15,28 +15,21 @@ const agentMetadata: Record<string, { name: string; role: string; emoji: string;
   'company-observer': { name: 'Usopp', role: 'Auditeur Opérations', emoji: '🎯', avatar: '/agents/company-observer.jpg', color: '#ef4444' },
 };
 
-const ASCII_LOGO = `
- ███████╗██████╗ ███████╗
- ██╔════╝██╔══██╗██╔════╝
- ███████╗██║  ██║█████╗
- ╚════██║██║  ██║██╔══╝
- ███████║██████╔╝██║
- ╚══════╝╚═════╝ ╚═╝
-`;
-
-const terminalLines = [
-  { prefix: '$', text: 'initializing agent cluster...', delay: 0 },
-  { prefix: '>', text: 'loading neural networks [████████████] 100%', delay: 800 },
-  { prefix: '>', text: 'connecting to market feeds...', delay: 1600 },
-  { prefix: '✓', text: '6 agents online. 0 humans required.', delay: 2400 },
-  { prefix: '$', text: 'starting autonomous operations_', delay: 3200 },
-];
+const MAX_CHARS = 350;
 
 export default function HomePage() {
   const [agents, setAgents] = useState<any[]>([]);
   const [signalsToday, setSignalsToday] = useState(0);
-  const [visibleLines, setVisibleLines] = useState(0);
   const [mounted, setMounted] = useState(false);
+
+  // Prompt submission state
+  const [prompt, setPrompt] = useState('');
+  const [authorName, setAuthorName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [todayCount, setTodayCount] = useState(0);
+  const [submitError, setSubmitError] = useState('');
+  const [countdown, setCountdown] = useState('');
 
   // Fetch real agent data from Supabase
   useEffect(() => {
@@ -92,15 +85,69 @@ export default function HomePage() {
 
   useEffect(() => {
     setMounted(true);
+    // Check localStorage for already submitted today
+    const lastSubmit = localStorage.getItem('lastSubmitDate');
+    const today = new Date().toISOString().split('T')[0];
+    if (lastSubmit === today) setSubmitted(true);
   }, []);
 
+  // Fetch today's prompt count
   useEffect(() => {
-    if (!mounted) return;
-    const timers = terminalLines.map((line, i) =>
-      setTimeout(() => setVisibleLines(i + 1), line.delay)
-    );
-    return () => timers.forEach(clearTimeout);
-  }, [mounted]);
+    const fetchTodayCount = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { count } = await supabase
+        .from('user_prompts')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', `${today}T00:00:00`);
+      setTodayCount(count || 0);
+    };
+    fetchTodayCount();
+  }, [submitted]);
+
+  // Countdown to 21h
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const deadline = new Date();
+      deadline.setHours(21, 0, 0, 0);
+      if (now > deadline) deadline.setDate(deadline.getDate() + 1);
+      const diff = deadline.getTime() - now.getTime();
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      setCountdown(`${hours}h${String(minutes).padStart(2, '0')}`);
+    };
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleSubmitPrompt = useCallback(async () => {
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
+    if (trimmed.length > MAX_CHARS) return;
+
+    setSubmitting(true);
+    setSubmitError('');
+
+    try {
+      const { error } = await supabase
+        .from('user_prompts')
+        .insert({
+          content: trimmed,
+          author_name: authorName.trim() || 'Anonyme',
+        });
+
+      if (error) throw error;
+
+      setSubmitted(true);
+      localStorage.setItem('lastSubmitDate', new Date().toISOString().split('T')[0]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erreur lors de la soumission';
+      setSubmitError(message);
+    } finally {
+      setSubmitting(false);
+    }
+  }, [prompt, authorName]);
 
   const getStatusColor = useCallback((status: string) => {
     return status === 'active' ? 'text-hacker-green' : 'text-hacker-muted';
@@ -146,30 +193,95 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right - Terminal */}
+          {/* Right - Prompt Submission */}
           <div className="terminal">
             <div className="terminal-header">
               <div className="terminal-dot red" />
               <div className="terminal-dot yellow" />
               <div className="terminal-dot green" />
-              <span className="text-xs text-hacker-muted ml-2">sdf-control-center</span>
+              <span className="text-xs text-hacker-muted ml-2">prompt.submit --interactive</span>
             </div>
-            <div className="p-4 space-y-2 min-h-[200px]">
-              <pre className="text-hacker-green text-[10px] sm:text-xs leading-tight opacity-40 mb-4">
-                {ASCII_LOGO}
-              </pre>
-              {terminalLines.slice(0, visibleLines).map((line, i) => (
-                <div key={i} className="flex gap-2 text-xs sm:text-sm animate-fade-in">
-                  <span className={line.prefix === '✓' ? 'text-hacker-green' : 'text-hacker-muted'}>
-                    {line.prefix}
-                  </span>
-                  <span className={line.prefix === '✓' ? 'text-hacker-green' : 'text-hacker-text'}>
-                    {line.text}
-                  </span>
+            <div className="p-4 space-y-4">
+              {submitted ? (
+                <div className="space-y-3 min-h-[200px] flex flex-col justify-center">
+                  <div className="flex gap-2 text-sm">
+                    <span className="text-hacker-green">✓</span>
+                    <span className="text-hacker-green">prompt transmis aux agents...</span>
+                  </div>
+                  <div className="flex gap-2 text-xs text-hacker-muted">
+                    <span>$</span>
+                    <span>en attente d&apos;évaluation</span>
+                    <span className="inline-block w-2 h-4 bg-hacker-green animate-blink" />
+                  </div>
+                  <div className="border-t border-hacker-border mt-4 pt-3 space-y-1">
+                    <div className="text-xs text-hacker-muted">
+                      &gt; {todayCount} idée{todayCount > 1 ? 's' : ''} soumise{todayCount > 1 ? 's' : ''} aujourd&apos;hui
+                    </div>
+                    <div className="text-xs text-hacker-muted">
+                      &gt; prochains résultats dans {countdown}
+                    </div>
+                  </div>
                 </div>
-              ))}
-              {visibleLines >= terminalLines.length && (
-                <span className="inline-block w-2 h-4 bg-hacker-green animate-blink mt-2" />
+              ) : (
+                <>
+                  <div className="text-xs text-hacker-muted">
+                    <span className="text-hacker-green">$</span> Décris ton idée<span className="inline-block w-1.5 h-3.5 bg-hacker-green animate-blink ml-0.5" />
+                  </div>
+
+                  <textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    maxLength={MAX_CHARS}
+                    rows={4}
+                    placeholder="Une app qui... Un outil pour... Un site web qui..."
+                    className="w-full bg-transparent border border-hacker-border text-hacker-text font-mono text-sm resize-none focus:border-hacker-green/50 focus:outline-none rounded px-3 py-2 placeholder:text-hacker-muted/40"
+                    disabled={submitting}
+                  />
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-hacker-muted shrink-0">Pseudo:</span>
+                    <input
+                      type="text"
+                      value={authorName}
+                      onChange={(e) => setAuthorName(e.target.value)}
+                      placeholder="Anonyme"
+                      maxLength={30}
+                      className="flex-1 bg-transparent border border-hacker-border text-hacker-text font-mono text-xs focus:border-hacker-green/50 focus:outline-none rounded px-2 py-1.5 placeholder:text-hacker-muted/40"
+                      disabled={submitting}
+                    />
+                  </div>
+
+                  {submitError && (
+                    <div className="text-xs text-red-400">&gt; erreur: {submitError}</div>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={handleSubmitPrompt}
+                      disabled={submitting || !prompt.trim()}
+                      className="btn-primary flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:color-current disabled:hover:shadow-none"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      {submitting ? 'envoi...' : 'soumettre'}
+                    </button>
+                    <span className={`text-xs font-mono ${
+                      prompt.length > 340 ? 'text-red-400' :
+                      prompt.length > 300 ? 'text-hacker-amber' :
+                      'text-hacker-green/60'
+                    }`}>
+                      {prompt.length}/{MAX_CHARS}
+                    </span>
+                  </div>
+
+                  <div className="border-t border-hacker-border pt-3 space-y-1">
+                    <div className="text-xs text-hacker-muted">
+                      &gt; {todayCount} idée{todayCount > 1 ? 's' : ''} soumise{todayCount > 1 ? 's' : ''} aujourd&apos;hui
+                    </div>
+                    <div className="text-xs text-hacker-muted">
+                      &gt; prochains résultats dans {countdown}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </div>
