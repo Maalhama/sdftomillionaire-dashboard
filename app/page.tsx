@@ -11,8 +11,8 @@ const agentMetadata: Record<string, { name: string; role: string; emoji: string;
   'brain': { name: 'Kira', role: 'Chef de Recherche', emoji: '🧠', avatar: '/agents/brain.png', color: '#8b5cf6' },
   'growth': { name: 'Madara', role: 'Spécialiste Croissance', emoji: '👁️', avatar: '/agents/growth.png', color: '#22c55e' },
   'creator': { name: 'Stark', role: 'Directeur Créatif', emoji: '🎨', avatar: '/agents/creator.jpg', color: '#ec4899' },
-  'twitter-alt': { name: 'L', role: 'Directeur Réseaux Sociaux', emoji: '⚡', avatar: '/agents/twitter-alt.jpg', color: '#3b82f6' },
-  'company-observer': { name: 'Usopp', role: 'Auditeur Opérations', emoji: '🎯', avatar: '/agents/company-observer.png', color: '#ef4444' },
+  'twitter-alt': { name: 'L', role: 'Directeur Réseaux Sociaux', emoji: '⚡', avatar: '/agents/twitter-alt.png', color: '#3b82f6' },
+  'company-observer': { name: 'Usopp', role: 'Auditeur Opérations', emoji: '🎯', avatar: '/agents/company-observer.jpg', color: '#ef4444' },
 };
 
 const ASCII_LOGO = `

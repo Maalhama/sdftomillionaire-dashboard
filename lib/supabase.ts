@@ -10,8 +10,8 @@ export const AGENTS = {
   brain: { name: 'Kira', emoji: '🧠', avatar: '/agents/brain.png', role: 'Chef de Recherche', color: '#8b5cf6' },
   growth: { name: 'Madara', emoji: '👁️', avatar: '/agents/growth.png', role: 'Spécialiste Croissance', color: '#22c55e' },
   creator: { name: 'Stark', emoji: '🎨', avatar: '/agents/creator.jpg', role: 'Directeur Créatif', color: '#ec4899' },
-  'twitter-alt': { name: 'L', emoji: '⚡', avatar: '/agents/twitter-alt.jpg', role: 'Directeur Réseaux Sociaux', color: '#3b82f6' },
-  'company-observer': { name: 'Usopp', emoji: '🎯', avatar: '/agents/company-observer.png', role: 'Auditeur Opérations', color: '#ef4444' },
+  'twitter-alt': { name: 'L', emoji: '⚡', avatar: '/agents/twitter-alt.png', role: 'Directeur Réseaux Sociaux', color: '#3b82f6' },
+  'company-observer': { name: 'Usopp', emoji: '🎯', avatar: '/agents/company-observer.jpg', role: 'Auditeur Opérations', color: '#ef4444' },
 };
 
 export type AgentId = keyof typeof AGENTS;

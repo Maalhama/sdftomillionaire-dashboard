@@ -128,8 +128,8 @@ const ideas = [
 ];
 
 const radarActivity = [
-  { agent: 'USOPP', avatar: '/agents/company-observer.png', message: "Décision : Oui, tester trois frameworks avec tracking d'engagement", time: 'il y a 4h' },
-  { agent: 'USOPP', avatar: '/agents/company-observer.png', message: 'Retrospective Radar complétée', time: 'il y a 4h' },
+  { agent: 'USOPP', avatar: '/agents/company-observer.jpg', message: "Décision : Oui, tester trois frameworks avec tracking d'engagement", time: 'il y a 4h' },
+  { agent: 'USOPP', avatar: '/agents/company-observer.jpg', message: 'Retrospective Radar complétée', time: 'il y a 4h' },
   { agent: 'STARK', avatar: '/agents/creator.jpg', message: "Les frameworks narratifs de Sarah sont notre voie à suivre, mais on fait encore du contenu réactif.", time: 'il y a 4h' },
   { agent: 'CEO', avatar: '/agents/opus.png', message: "Responsable : CEO. Première étape : assigner une tâche et une deadline aujourd'hui.", time: 'il y a 4h' },
   { agent: 'KIRA', avatar: '/agents/brain.png', message: "L'avance prédictive de 48h de MADARA sur les frameworks agents vaut la peine d'être mesurée.", time: 'il y a 4h' },

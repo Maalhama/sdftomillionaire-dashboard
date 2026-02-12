@@ -46,8 +46,8 @@ const agentAvatars: Record<string, string> = {
   brain: '/agents/brain.png',
   growth: '/agents/growth.png',
   creator: '/agents/creator.jpg',
-  'twitter-alt': '/agents/twitter-alt.jpg',
-  'company-observer': '/agents/company-observer.png',
+  'twitter-alt': '/agents/twitter-alt.png',
+  'company-observer': '/agents/company-observer.jpg',
 };
 
 const agentModelPaths: Record<string, string> = {
