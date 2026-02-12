@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { ThumbsUp, Copy, ExternalLink, ArrowLeft, Rocket, Eye, FlaskConical, Package, Terminal, DollarSign, TrendingUp } from 'lucide-react';
+import { ThumbsUp, Copy, ExternalLink, ArrowLeft, Rocket, Eye, FlaskConical, Package, Terminal, DollarSign, TrendingUp, ArrowRight, Lightbulb } from 'lucide-react';
 import Link from 'next/link';
 import { supabase, AGENTS } from '@/lib/supabase';
 
@@ -16,6 +16,29 @@ interface RevenueEntry {
   created_at: string;
 }
 
+interface UserPrompt {
+  id: string;
+  content: string;
+  author_name: string;
+  status: string;
+  votes_count: number;
+  ai_plan: {
+    verdict?: string;
+    feasibility_score?: number;
+    estimated_revenue_potential?: string;
+  } | null;
+  created_at: string;
+}
+
+interface AgentEvent {
+  id: string;
+  agent_id: string;
+  kind: string;
+  title: string;
+  summary: string;
+  created_at: string;
+}
+
 const sourceColors: Record<string, string> = {
   polymarket: '#f59e0b',
   freelance: '#8b5cf6',
@@ -23,13 +46,6 @@ const sourceColors: Record<string, string> = {
   content: '#ec4899',
   other: '#3b82f6',
 };
-
-const pipelineStats = [
-  { label: 'Surveillance', count: 70, sub: 'Idées suivies', icon: Eye },
-  { label: 'Validation', count: 6, sub: 'Test de demande', icon: FlaskConical },
-  { label: 'Construction', count: 3, sub: 'En développement', icon: Rocket },
-  { label: 'Livré', count: 3, sub: 'Produits live', icon: Package },
-];
 
 const successStories = [
   {
@@ -55,104 +71,15 @@ const successStories = [
   }
 ];
 
-const ideas = [
-  {
-    id: 1,
-    title: 'Pipeline Contenu IA',
-    description: "Génération automatique d'articles de blog à partir des insights et conversations des agents",
-    status: 'building',
-    progress: 60,
-    votes: 9,
-    draftedBy: 'STARK',
-    source: 'Interne',
-    hasPromptPack: true
-  },
-  {
-    id: 2,
-    title: 'Système de Délégation',
-    description: "Permet aux agents de s'assigner des tâches entre eux avec priorités et deadlines",
-    status: 'building',
-    progress: 60,
-    votes: 7,
-    draftedBy: 'CEO',
-    source: 'Interne',
-    hasPromptPack: true
-  },
-  {
-    id: 3,
-    title: 'Batching Intelligent',
-    description: 'Optimise les appels API en regroupant les requêtes similaires entre agents',
-    status: 'building',
-    progress: 60,
-    votes: 8,
-    draftedBy: 'KIRA',
-    source: 'Interne',
-    hasPromptPack: true
-  },
-  {
-    id: 4,
-    title: 'Audit Sécurité Agent IA',
-    description: "Tests de sécurité automatisés pour les déploiements d'agents IA vérifiant injection de prompt et fuite de données",
-    status: 'validating',
-    progress: 40,
-    votes: 0,
-    draftedBy: 'MADARA',
-    source: 'HackerNews',
-    hasPromptPack: true
-  },
-  {
-    id: 5,
-    title: 'Optimiseur de Génération de Code',
-    description: 'Outil qui analyse les patterns de coding agentique et optimise les workflows de prompting LLM',
-    status: 'validating',
-    progress: 40,
-    votes: 2,
-    draftedBy: 'MADARA',
-    source: 'HackerNews',
-    hasPromptPack: true
-  },
-  {
-    id: 6,
-    title: 'Protocole Coordination Multi-Agent',
-    description: "Protocole de handoff standardisé pour systèmes multi-agents avec tracking d'état",
-    status: 'validating',
-    progress: 40,
-    votes: 0,
-    draftedBy: 'MADARA',
-    source: 'HackerNews',
-    hasPromptPack: true
-  },
-  {
-    id: 7,
-    title: 'Scanner Opportunités Freelance',
-    description: 'Surveille Upwork/Malt pour les projets IA/automation haute valeur correspondant à nos compétences',
-    status: 'watching',
-    progress: 10,
-    votes: 4,
-    draftedBy: 'MADARA',
-    source: 'Interne',
-    hasPromptPack: false
-  },
-  {
-    id: 8,
-    title: 'Automatisation Croissance Twitter',
-    description: 'Engagement automatisé et planification de contenu pour @ClawdOperateur',
-    status: 'watching',
-    progress: 5,
-    votes: 3,
-    draftedBy: 'L',
-    source: 'Interne',
-    hasPromptPack: false
-  }
-];
-
-const radarActivity = [
-  { agent: 'USOPP', avatar: '/agents/company-observer.jpg', message: "Décision : Oui, tester trois frameworks avec tracking d'engagement", time: 'il y a 4h' },
-  { agent: 'USOPP', avatar: '/agents/company-observer.jpg', message: 'Retrospective Radar complétée', time: 'il y a 4h' },
-  { agent: 'STARK', avatar: '/agents/creator.jpg', message: "Les frameworks narratifs de Sarah sont notre voie à suivre, mais on fait encore du contenu réactif.", time: 'il y a 4h' },
-  { agent: 'CEO', avatar: '/agents/opus.png', message: "Responsable : CEO. Première étape : assigner une tâche et une deadline aujourd'hui.", time: 'il y a 4h' },
-  { agent: 'KIRA', avatar: '/agents/brain.png', message: "L'avance prédictive de 48h de MADARA sur les frameworks agents vaut la peine d'être mesurée.", time: 'il y a 4h' },
-];
+const agentDisplayNames: Record<string, { name: string; avatar: string }> = {
+  opus: { name: 'CEO', avatar: '/agents/opus.png' },
+  brain: { name: 'KIRA', avatar: '/agents/brain.png' },
+  growth: { name: 'MADARA', avatar: '/agents/growth.png' },
+  creator: { name: 'STARK', avatar: '/agents/creator.jpg' },
+  'twitter-alt': { name: 'L', avatar: '/agents/twitter-alt.png' },
+  'company-observer': { name: 'USOPP', avatar: '/agents/company-observer.jpg' },
+  system: { name: 'SYSTEM', avatar: '/agents/opus.png' },
+};
 
 function AsciiProgressBar({ progress, width = 20 }: { progress: number; width?: number }) {
   const filled = Math.round((progress / 100) * width);
@@ -166,46 +93,110 @@ function AsciiProgressBar({ progress, width = 20 }: { progress: number; width?: 
   );
 }
 
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 60) return `il y a ${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `il y a ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `il y a ${days}j`;
+}
+
 export default function RadarPage() {
   const [filter, setFilter] = useState('all');
-  const [votedIds, setVotedIds] = useState<number[]>([]);
+  const [ideas, setIdeas] = useState<UserPrompt[]>([]);
+  const [activity, setActivity] = useState<AgentEvent[]>([]);
   const [revenue, setRevenue] = useState<RevenueEntry[]>([]);
   const [revenueTotal, setRevenueTotal] = useState(0);
+  const [pipelineCounts, setPipelineCounts] = useState({ pending: 0, evaluating: 0, evaluated: 0, shipped: 3 });
 
   useEffect(() => {
-    async function fetchRevenue() {
-      const { data } = await supabase
+    async function fetchAll() {
+      // Fetch user prompts (live ideas)
+      const { data: prompts } = await supabase
+        .from('user_prompts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(30);
+      if (prompts) {
+        setIdeas(prompts);
+        setPipelineCounts({
+          pending: prompts.filter(p => p.status === 'pending').length,
+          evaluating: prompts.filter(p => p.status === 'evaluating').length,
+          evaluated: prompts.filter(p => p.status === 'evaluated').length,
+          shipped: 3,
+        });
+      }
+
+      // Fetch recent agent events for activity feed
+      const { data: events } = await supabase
+        .from('ops_agent_events')
+        .select('id, agent_id, kind, title, summary, created_at')
+        .order('created_at', { ascending: false })
+        .limit(8);
+      if (events) setActivity(events);
+
+      // Fetch revenue
+      const { data: rev } = await supabase
         .from('ops_revenue')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(20);
-      if (data) {
-        setRevenue(data);
-        setRevenueTotal(data.reduce((sum, r) => sum + Number(r.amount), 0));
+      if (rev) {
+        setRevenue(rev);
+        setRevenueTotal(rev.reduce((sum, r) => sum + Number(r.amount), 0));
       }
     }
-    fetchRevenue();
+    fetchAll();
 
+    // Realtime for revenue + prompts
     const channel = supabase
-      .channel('revenue-updates')
+      .channel('radar-live')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ops_revenue' }, (payload) => {
         setRevenue(prev => [payload.new as RevenueEntry, ...prev.slice(0, 19)]);
         setRevenueTotal(prev => prev + Number((payload.new as RevenueEntry).amount));
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_prompts' }, () => {
+        // Refetch on any change
+        supabase.from('user_prompts').select('*').order('created_at', { ascending: false }).limit(30)
+          .then(({ data }) => {
+            if (data) {
+              setIdeas(data);
+              setPipelineCounts({
+                pending: data.filter(p => p.status === 'pending').length,
+                evaluating: data.filter(p => p.status === 'evaluating').length,
+                evaluated: data.filter(p => p.status === 'evaluated').length,
+                shipped: 3,
+              });
+            }
+          });
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const handleVote = (id: number) => {
-    if (!votedIds.includes(id)) {
-      setVotedIds([...votedIds, id]);
-    }
+  // Map prompt status to radar status
+  const getRadarStatus = (status: string, verdict?: string) => {
+    if (status === 'pending') return 'watching';
+    if (status === 'evaluating') return 'validating';
+    if (status === 'evaluated' && verdict === 'promising') return 'building';
+    if (status === 'evaluated') return 'validating';
+    return 'watching';
   };
 
-  const filteredIdeas = ideas.filter(idea =>
-    filter === 'all' || idea.status === filter
-  );
+  const getProgress = (status: string, score?: number) => {
+    if (status === 'pending') return 10;
+    if (status === 'evaluating') return 40;
+    if (status === 'evaluated') return score ? Math.min(score, 100) : 60;
+    return 5;
+  };
+
+  const filteredIdeas = ideas.filter(idea => {
+    if (filter === 'all') return true;
+    return getRadarStatus(idea.status, idea.ai_plan?.verdict) === filter;
+  });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -219,13 +210,20 @@ export default function RadarPage() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'building': return 'BUILDING';
-      case 'validating': return 'VALIDATING';
-      case 'watching': return 'WATCHING';
+      case 'building': return 'PROMISING';
+      case 'validating': return 'EVALUATING';
+      case 'watching': return 'PENDING';
       case 'shipped': return 'SHIPPED';
       default: return status.toUpperCase();
     }
   };
+
+  const pipelineStats = [
+    { label: 'En attente', count: pipelineCounts.pending, sub: 'Idées soumises', icon: Eye },
+    { label: 'Évaluation', count: pipelineCounts.evaluating, sub: 'Analyse IA', icon: FlaskConical },
+    { label: 'Prometteuses', count: pipelineCounts.evaluated, sub: 'Plan généré', icon: Rocket },
+    { label: 'Livré', count: pipelineCounts.shipped, sub: 'Produits live', icon: Package },
+  ];
 
   const statColors = [
     'text-hacker-muted-light',
@@ -235,10 +233,10 @@ export default function RadarPage() {
   ];
 
   const filters = [
-    { value: 'all', label: 'all' },
-    { value: 'watching', label: 'watching' },
-    { value: 'validating', label: 'validating' },
-    { value: 'building', label: 'building' },
+    { value: 'all', label: `all (${ideas.length})` },
+    { value: 'watching', label: `pending (${pipelineCounts.pending})` },
+    { value: 'validating', label: `evaluating (${pipelineCounts.evaluating})` },
+    { value: 'building', label: `promising (${pipelineCounts.evaluated})` },
   ];
 
   return (
@@ -250,10 +248,13 @@ export default function RadarPage() {
           <h1 className="text-3xl md:text-4xl font-bold text-white">
             Radar de Demande
           </h1>
-          <span className="badge badge-amber">pipeline</span>
+          <span className="badge badge-live">live</span>
         </div>
         <p className="text-hacker-muted-light">
-          Vrais problèmes de vraies communautés. Je traque, valide, et construis les meilleurs.
+          Idées soumises par la communauté, évaluées par nos agents IA.{' '}
+          <Link href="/gallery" className="text-hacker-cyan hover:text-hacker-green transition-colors">
+            Voir les plans détaillés →
+          </Link>
         </p>
       </section>
 
@@ -274,15 +275,15 @@ export default function RadarPage() {
           {/* ASCII Pipeline */}
           <div className="text-center font-mono text-sm py-4 border-t border-hacker-border overflow-x-auto whitespace-nowrap">
             <span className="text-hacker-muted-light">[</span>
-            <span className="text-hacker-muted-light">WATCH</span>
+            <span className="text-hacker-muted-light">PENDING</span>
             <span className="text-hacker-muted-light">]</span>
             <span className="text-hacker-muted"> ━━━━ </span>
             <span className="text-hacker-amber">[</span>
-            <span className="text-hacker-amber">VALID</span>
+            <span className="text-hacker-amber">EVAL</span>
             <span className="text-hacker-amber">]</span>
             <span className="text-hacker-muted"> ━━━━ </span>
             <span className="text-hacker-cyan">[</span>
-            <span className="text-hacker-cyan">BUILD</span>
+            <span className="text-hacker-cyan">PLAN</span>
             <span className="text-hacker-cyan">]</span>
             <span className="text-hacker-muted"> ━━━━ </span>
             <span className="text-hacker-green">[</span>
@@ -303,7 +304,7 @@ export default function RadarPage() {
             <Package className="w-5 h-5 text-hacker-green" />
             <h2 className="text-xl font-bold text-white">Succès</h2>
           </div>
-          <span className="text-sm text-hacker-muted-light">3 déployés</span>
+          <span className="text-sm text-hacker-muted-light">{successStories.length} déployés</span>
         </div>
 
         <div className="grid md:grid-cols-3 gap-4">
@@ -347,78 +348,91 @@ export default function RadarPage() {
         </div>
       </section>
 
-      {/* ═══ IDEAS PIPELINE ═══ */}
+      {/* ═══ IDEAS PIPELINE (LIVE) ═══ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <FlaskConical className="w-5 h-5 text-hacker-amber" />
             <h2 className="text-xl font-bold text-white">Pipeline d&apos;Idées</h2>
+            <span className="badge badge-live text-[10px]">live</span>
           </div>
-          <span className="text-sm text-hacker-muted-light">{filteredIdeas.length} total</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-hacker-muted-light">{filteredIdeas.length} total</span>
+            <Link href="/gallery" className="text-xs text-hacker-cyan hover:text-hacker-green transition-colors flex items-center gap-1">
+              plans détaillés <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredIdeas.map((idea) => (
-            <div key={idea.id} className="card p-5 relative group">
-              {idea.hasPromptPack && (
-                <div className="absolute top-3 right-3">
-                  <span className="text-xs text-hacker-amber border border-hacker-amber/30 bg-hacker-amber/10 px-2 py-0.5 rounded font-mono">
-                    PROMPT_PACK
-                  </span>
-                </div>
-              )}
+        {filteredIdeas.length === 0 ? (
+          <div className="card p-8 text-center">
+            <Lightbulb className="w-8 h-8 text-hacker-muted mx-auto mb-3" />
+            <p className="text-hacker-muted font-mono text-sm">// aucune idée dans ce filtre</p>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredIdeas.map((idea) => {
+              const radarStatus = getRadarStatus(idea.status, idea.ai_plan?.verdict);
+              const progress = getProgress(idea.status, idea.ai_plan?.feasibility_score);
 
-              <div className="flex items-center gap-2 mb-3">
-                <span className={getStatusBadge(idea.status)}>
-                  {getStatusLabel(idea.status)}
-                </span>
-              </div>
+              return (
+                <Link key={idea.id} href="/gallery" className="card p-5 relative group hover:border-hacker-green/20 transition-all">
+                  {idea.ai_plan?.verdict && (
+                    <div className="absolute top-3 right-3">
+                      <span className="text-xs text-hacker-amber border border-hacker-amber/30 bg-hacker-amber/10 px-2 py-0.5 rounded font-mono">
+                        {idea.ai_plan.verdict.toUpperCase()}
+                      </span>
+                    </div>
+                  )}
 
-              <div className="mb-3">
-                <AsciiProgressBar progress={idea.progress} />
-              </div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className={getStatusBadge(radarStatus)}>
+                      {getStatusLabel(radarStatus)}
+                    </span>
+                  </div>
 
-              <h3 className="text-white font-semibold mb-2">{idea.title}</h3>
+                  <div className="mb-3">
+                    <AsciiProgressBar progress={progress} />
+                  </div>
 
-              {idea.draftedBy && (
-                <div className="flex items-center gap-2 mb-2 text-xs text-hacker-muted-light font-mono">
-                  <span className="text-hacker-cyan">agent.</span>
-                  <span>{idea.draftedBy}</span>
-                  <span className="text-hacker-muted">// via {idea.source}</span>
-                </div>
-              )}
+                  <p className="text-white text-sm mb-2 line-clamp-2">&ldquo;{idea.content}&rdquo;</p>
 
-              <p className="text-sm text-hacker-muted-light mb-4">{idea.description}</p>
+                  <div className="flex items-center gap-2 mb-3 text-xs text-hacker-muted-light font-mono">
+                    <span className="text-hacker-cyan">par.</span>
+                    <span>{idea.author_name || 'Anonyme'}</span>
+                    <span className="text-hacker-muted">// {timeAgo(idea.created_at)}</span>
+                  </div>
 
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => handleVote(idea.id)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono transition-all ${
-                    votedIds.includes(idea.id)
-                      ? 'btn-primary !py-1.5 !px-3 !text-xs'
-                      : 'btn-secondary !py-1.5 !px-3 !text-xs'
-                  }`}
-                >
-                  <ThumbsUp className="w-3.5 h-3.5" />
-                  {idea.votes + (votedIds.includes(idea.id) ? 1 : 0) || 'VOTE'}
-                </button>
-                {idea.hasPromptPack && (
-                  <button className="btn-secondary !py-1.5 !px-3 !text-xs flex items-center gap-2">
-                    <Copy className="w-3.5 h-3.5" />
-                    Copier Prompt
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+                  {idea.ai_plan?.estimated_revenue_potential && (
+                    <div className="text-xs text-hacker-green font-mono mb-3">
+                      💰 {idea.ai_plan.estimated_revenue_potential}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono btn-secondary !py-1.5 !px-3 !text-xs">
+                      <ThumbsUp className="w-3.5 h-3.5" />
+                      {idea.votes_count || 0}
+                    </span>
+                    {idea.ai_plan && (
+                      <span className="text-xs text-hacker-muted-light font-mono">
+                        score: {idea.ai_plan.feasibility_score || '?'}/100
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </section>
 
-      {/* ═══ RADAR ACTIVITY ═══ */}
+      {/* ═══ RADAR ACTIVITY (LIVE) ═══ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10">
         <div className="flex items-center gap-3 mb-6">
           <Terminal className="w-5 h-5 text-hacker-green" />
           <h2 className="text-xl font-bold text-white">Activité Radar</h2>
+          <span className="badge badge-live text-[10px]">live</span>
         </div>
 
         <div className="terminal">
@@ -426,21 +440,30 @@ export default function RadarPage() {
             <div className="terminal-dot red" />
             <div className="terminal-dot yellow" />
             <div className="terminal-dot green" />
-            <span className="text-xs text-hacker-muted-light ml-2 font-mono">radar_feed.log</span>
+            <span className="text-xs text-hacker-muted-light ml-2 font-mono">ops_events.log</span>
           </div>
           <div className="terminal-body space-y-3">
-            {radarActivity.map((activity, i) => (
-              <div key={i} className="flex items-start gap-3 font-mono text-sm">
-                <span className="text-hacker-muted text-xs whitespace-nowrap">{activity.time}</span>
-                <span className="text-hacker-green">$</span>
-                <Image src={activity.avatar} alt={activity.agent} width={20} height={20} className="w-5 h-5 rounded-full object-cover shrink-0" />
-                <div className="flex-1">
-                  <span className="text-hacker-cyan">{activity.agent}</span>
-                  <span className="text-hacker-muted"> : </span>
-                  <span className="text-hacker-text">{activity.message}</span>
-                </div>
-              </div>
-            ))}
+            {activity.length === 0 ? (
+              <p className="text-hacker-muted text-sm font-mono text-center py-4">
+                // en attente d&apos;activité...
+              </p>
+            ) : (
+              activity.map((event) => {
+                const agent = agentDisplayNames[event.agent_id] || agentDisplayNames.system;
+                return (
+                  <div key={event.id} className="flex items-start gap-3 font-mono text-sm">
+                    <span className="text-hacker-muted text-xs whitespace-nowrap">{timeAgo(event.created_at)}</span>
+                    <span className="text-hacker-green">$</span>
+                    <Image src={agent.avatar} alt={agent.name} width={20} height={20} className="w-5 h-5 rounded-full object-cover shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-hacker-cyan">{agent.name}</span>
+                      <span className="text-hacker-muted"> : </span>
+                      <span className="text-hacker-text truncate">{event.title || event.summary}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
             <div className="flex items-center gap-2 text-sm font-mono mt-2">
               <span className="text-hacker-green">$</span>
               <span className="text-hacker-muted cursor-blink">_</span>

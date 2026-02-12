@@ -219,13 +219,20 @@ export default function HomePage() {
                     <span>en attente d&apos;évaluation</span>
                     <span className="inline-block w-2 h-4 bg-hacker-green animate-blink" />
                   </div>
-                  <div className="border-t border-hacker-border mt-4 pt-3 space-y-1">
+                  <div className="border-t border-hacker-border mt-4 pt-3 space-y-2">
                     <div className="text-xs text-hacker-muted">
                       &gt; {todayCount} idée{todayCount > 1 ? 's' : ''} soumise{todayCount > 1 ? 's' : ''} aujourd&apos;hui
                     </div>
                     <div className="text-xs text-hacker-muted">
                       &gt; prochains résultats dans {countdown}
                     </div>
+                    <div className="text-xs text-hacker-muted">
+                      &gt; 6 agents IA vont analyser ton idée et générer un plan d&apos;action
+                    </div>
+                    <Link href="/gallery" className="inline-flex items-center gap-1.5 text-xs text-hacker-cyan hover:text-hacker-green transition-colors mt-2">
+                      <ArrowRight className="w-3 h-3" />
+                      voir les évaluations dans la galerie
+                    </Link>
                   </div>
                 </div>
               ) : (
