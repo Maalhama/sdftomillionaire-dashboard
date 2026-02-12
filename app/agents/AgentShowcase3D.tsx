@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useRef, useMemo, useState, useEffect, useCallback, Component, type ReactNode } from 'react';
+import { Suspense, useRef, useMemo, useState, useCallback, useEffect, Component, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Grid, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
@@ -23,13 +23,11 @@ class Showcase3DErrorBoundary extends Component<{ children: ReactNode; fallback:
   }
 }
 
-// ═══ ROOM CONSTANTS ═══
+// ═══ CONSTANTS ═══
 
-const ROOM_W = 10;
-const ROOM_D = 8;
-const ROOM_H = 3.5;
-const WALL_COLOR = '#080808';
 const NEON_GREEN = '#00ff41';
+const GRID_SIZE = 20;
+const PARTICLE_COUNT = 300;
 
 // ═══ SHOWCASE MODEL ═══
 
@@ -62,7 +60,6 @@ function ShowcaseAgent({ modelPath, agentColor }: { modelPath: string; agentColo
   return (
     <group ref={groupRef} scale={[1.5, 1.5, 1.5]}>
       <primitive object={clonedScene} />
-      {/* Neon ring under agent */}
       <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.4, 0.55, 48]} />
         <meshBasicMaterial color={agentColor} transparent opacity={0.35} side={THREE.DoubleSide} />
@@ -77,17 +74,14 @@ function ShowcaseAgent({ modelPath, agentColor }: { modelPath: string; agentColo
 function FloorPlatform({ agentColor }: { agentColor: string }) {
   return (
     <>
-      {/* Central circular platform */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
         <circleGeometry args={[2.2, 48]} />
         <meshStandardMaterial color="#0a0a0a" emissive={agentColor} emissiveIntensity={0.02} />
       </mesh>
-      {/* Platform neon ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
         <ringGeometry args={[2.1, 2.25, 48]} />
         <meshBasicMaterial color={agentColor} transparent opacity={0.3} side={THREE.DoubleSide} />
       </mesh>
-      {/* Inner ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
         <ringGeometry args={[1.4, 1.45, 48]} />
         <meshBasicMaterial color={agentColor} transparent opacity={0.15} side={THREE.DoubleSide} />
@@ -96,26 +90,24 @@ function FloorPlatform({ agentColor }: { agentColor: string }) {
   );
 }
 
-// ═══ ROOM ENVIRONMENT ═══
+// ═══ MATRIX GRID FLOOR ═══
 
-function RoomFloor() {
+function MatrixFloor() {
   return (
     <>
-      {/* Dark floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
-        <planeGeometry args={[ROOM_W, ROOM_D]} />
-        <meshStandardMaterial color="#040404" />
+        <planeGeometry args={[GRID_SIZE, GRID_SIZE]} />
+        <meshStandardMaterial color="#020202" />
       </mesh>
-      {/* Matrix grid */}
       <Grid
-        args={[ROOM_W, ROOM_D]}
+        args={[GRID_SIZE, GRID_SIZE]}
         cellSize={0.5}
         cellThickness={0.3}
         cellColor={NEON_GREEN}
         sectionSize={2}
         sectionThickness={0.6}
         sectionColor={NEON_GREEN}
-        fadeDistance={10}
+        fadeDistance={14}
         fadeStrength={2}
         position={[0, 0, 0]}
       />
@@ -123,205 +115,114 @@ function RoomFloor() {
   );
 }
 
-function RoomCeiling() {
-  return (
-    <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, ROOM_H, 0]}>
-      <planeGeometry args={[ROOM_W, ROOM_D]} />
-      <meshStandardMaterial color="#030303" transparent opacity={0.6} />
-    </mesh>
-  );
-}
+// ═══ MATRIX RAIN PARTICLES ═══
 
-// Wall segment
-function Wall({ start, end, height = ROOM_H }: { start: [number, number]; end: [number, number]; height?: number }) {
-  const dx = end[0] - start[0];
-  const dz = end[1] - start[1];
-  const length = Math.sqrt(dx * dx + dz * dz);
-  const angle = Math.atan2(dx, dz);
-  const cx = (start[0] + end[0]) / 2;
-  const cz = (start[1] + end[1]) / 2;
+function MatrixRain() {
+  const pointsRef = useRef<THREE.Points>(null);
+
+  const { positions, speeds, phases } = useMemo(() => {
+    const pos = new Float32Array(PARTICLE_COUNT * 3);
+    const spd = new Float32Array(PARTICLE_COUNT);
+    const phs = new Float32Array(PARTICLE_COUNT);
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const i3 = i * 3;
+      // Spread particles in a wide area around center
+      pos[i3] = (Math.random() - 0.5) * GRID_SIZE;       // x
+      pos[i3 + 1] = Math.random() * 12;                   // y (0 to 12 height)
+      pos[i3 + 2] = (Math.random() - 0.5) * GRID_SIZE;   // z
+      spd[i] = 1.5 + Math.random() * 3;                   // fall speed
+      phs[i] = Math.random() * Math.PI * 2;               // phase for brightness flicker
+    }
+
+    return { positions: pos, speeds: spd, phases: phs };
+  }, []);
+
+  useFrame((state) => {
+    if (!pointsRef.current) return;
+    const posArray = pointsRef.current.geometry.attributes.position.array as Float32Array;
+    const t = state.clock.elapsedTime;
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const i3 = i * 3;
+      // Fall down
+      posArray[i3 + 1] -= speeds[i] * 0.016; // ~60fps delta
+
+      // Reset to top when hitting ground
+      if (posArray[i3 + 1] < 0) {
+        posArray[i3] = (Math.random() - 0.5) * GRID_SIZE;
+        posArray[i3 + 1] = 8 + Math.random() * 4;
+        posArray[i3 + 2] = (Math.random() - 0.5) * GRID_SIZE;
+      }
+    }
+
+    pointsRef.current.geometry.attributes.position.needsUpdate = true;
+
+    // Subtle flicker on the material
+    const mat = pointsRef.current.material as THREE.PointsMaterial;
+    mat.opacity = 0.5 + Math.sin(t * 2) * 0.1;
+  });
 
   return (
-    <mesh position={[cx, height / 2, cz]} rotation={[0, angle, 0]}>
-      <boxGeometry args={[0.08, height, length]} />
-      <meshStandardMaterial
-        color={WALL_COLOR}
-        emissive={NEON_GREEN}
-        emissiveIntensity={0.015}
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={PARTICLE_COUNT}
+          array={positions}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        color={NEON_GREEN}
+        size={0.06}
         transparent
-        opacity={0.9}
+        opacity={0.6}
+        sizeAttenuation
+        depthWrite={false}
       />
-    </mesh>
+    </points>
   );
 }
 
-// Neon strip along wall top
-function NeonStrip({ start, end, color = NEON_GREEN }: { start: [number, number]; end: [number, number]; color?: string }) {
-  const dx = end[0] - start[0];
-  const dz = end[1] - start[1];
-  const length = Math.sqrt(dx * dx + dz * dz);
-  const angle = Math.atan2(dx, dz);
-  const cx = (start[0] + end[0]) / 2;
-  const cz = (start[1] + end[1]) / 2;
+// Taller vertical "streams" — thin green lines falling like Matrix code columns
+function MatrixStreams() {
+  const STREAM_COUNT = 40;
+  const groupRef = useRef<THREE.Group>(null);
 
-  return (
-    <group>
-      <mesh position={[cx, ROOM_H + 0.01, cz]} rotation={[0, angle, 0]}>
-        <boxGeometry args={[0.1, 0.03, length]} />
-        <meshBasicMaterial color={color} transparent opacity={0.5} />
-      </mesh>
-      {/* Floor-level neon strip */}
-      <mesh position={[cx, 0.01, cz]} rotation={[0, angle, 0]}>
-        <boxGeometry args={[0.06, 0.02, length]} />
-        <meshBasicMaterial color={color} transparent opacity={0.2} />
-      </mesh>
-      <pointLight position={[cx, ROOM_H + 0.05, cz]} color={color} intensity={0.15} distance={3} />
-    </group>
-  );
-}
+  const streams = useMemo(() => {
+    return Array.from({ length: STREAM_COUNT }, () => ({
+      x: (Math.random() - 0.5) * GRID_SIZE,
+      z: (Math.random() - 0.5) * GRID_SIZE,
+      y: Math.random() * 10,
+      speed: 2 + Math.random() * 4,
+      height: 0.3 + Math.random() * 1.5,
+      opacity: 0.1 + Math.random() * 0.25,
+    }));
+  }, []);
 
-function RoomWalls({ agentColor }: { agentColor: string }) {
-  const hw = ROOM_W / 2;
-  const hd = ROOM_D / 2;
-
-  const walls: [number, number][][] = [
-    [[-hw, -hd], [hw, -hd]],  // front
-    [[hw, -hd], [hw, hd]],    // right
-    [[hw, hd], [-hw, hd]],    // back
-    [[-hw, hd], [-hw, -hd]],  // left
-  ];
-
-  return (
-    <group>
-      {walls.map((wall, i) => (
-        <group key={i}>
-          <Wall start={wall[0]} end={wall[1]} />
-          <NeonStrip start={wall[0]} end={wall[1]} color={i === 0 || i === 2 ? agentColor : NEON_GREEN} />
-        </group>
-      ))}
-    </group>
-  );
-}
-
-// ═══ ROOM DETAILS ═══
-
-// Holographic data panels on walls
-function HoloPanel({ position, rotation, color, width = 1.2 }: {
-  position: [number, number, number];
-  rotation: [number, number, number];
-  color: string;
-  width?: number;
-}) {
-  const meshRef = useRef<THREE.Mesh>(null);
-
-  useFrame((state) => {
-    if (!meshRef.current) return;
-    const mat = meshRef.current.material as THREE.MeshBasicMaterial;
-    mat.opacity = 0.08 + Math.sin(state.clock.elapsedTime * 0.5) * 0.03;
+  useFrame(() => {
+    if (!groupRef.current) return;
+    groupRef.current.children.forEach((child, i) => {
+      const s = streams[i];
+      child.position.y -= s.speed * 0.016;
+      if (child.position.y < -s.height) {
+        child.position.y = 8 + Math.random() * 4;
+        child.position.x = (Math.random() - 0.5) * GRID_SIZE;
+        child.position.z = (Math.random() - 0.5) * GRID_SIZE;
+      }
+    });
   });
 
   return (
-    <mesh ref={meshRef} position={position} rotation={rotation}>
-      <planeGeometry args={[width, 1.4]} />
-      <meshBasicMaterial color={color} transparent opacity={0.1} side={THREE.DoubleSide} />
-    </mesh>
-  );
-}
-
-// Vertical neon accent pillars at corners
-function NeonPillar({ position, color }: { position: [number, number, number]; color: string }) {
-  return (
-    <group position={position}>
-      <mesh>
-        <boxGeometry args={[0.06, ROOM_H, 0.06]} />
-        <meshBasicMaterial color={color} transparent opacity={0.3} />
-      </mesh>
-      <pointLight color={color} intensity={0.2} distance={2.5} position={[0, ROOM_H / 2, 0]} />
-    </group>
-  );
-}
-
-// Floating holographic ring that rotates
-function HoloRing({ agentColor }: { agentColor: string }) {
-  const ringRef = useRef<THREE.Mesh>(null);
-
-  useFrame((state) => {
-    if (!ringRef.current) return;
-    ringRef.current.rotation.y = state.clock.elapsedTime * 0.15;
-    ringRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.3) * 0.1;
-  });
-
-  return (
-    <mesh ref={ringRef} position={[0, 2.8, 0]}>
-      <torusGeometry args={[1.8, 0.015, 8, 64]} />
-      <meshBasicMaterial color={agentColor} transparent opacity={0.2} />
-    </mesh>
-  );
-}
-
-// Ceiling light fixtures
-function CeilingLights({ agentColor }: { agentColor: string }) {
-  return (
-    <>
-      {/* Central spotlight */}
-      <spotLight
-        position={[0, ROOM_H - 0.1, 0]}
-        angle={0.5}
-        penumbra={0.8}
-        intensity={0.6}
-        color={agentColor}
-        distance={5}
-        target-position={[0, 0, 0]}
-      />
-      {/* Fixture mesh */}
-      <mesh position={[0, ROOM_H - 0.05, 0]}>
-        <cylinderGeometry args={[0.3, 0.2, 0.06, 16]} />
-        <meshBasicMaterial color={agentColor} transparent opacity={0.3} />
-      </mesh>
-      {/* Side ceiling strips */}
-      {[-2, 2].map((x) => (
-        <group key={x}>
-          <mesh position={[x, ROOM_H - 0.02, 0]}>
-            <boxGeometry args={[0.04, 0.02, ROOM_D * 0.6]} />
-            <meshBasicMaterial color={NEON_GREEN} transparent opacity={0.25} />
-          </mesh>
-          <pointLight position={[x, ROOM_H - 0.1, 0]} color={NEON_GREEN} intensity={0.1} distance={3} />
-        </group>
+    <group ref={groupRef}>
+      {streams.map((s, i) => (
+        <mesh key={i} position={[s.x, s.y, s.z]}>
+          <boxGeometry args={[0.02, s.height, 0.02]} />
+          <meshBasicMaterial color={NEON_GREEN} transparent opacity={s.opacity} />
+        </mesh>
       ))}
-    </>
-  );
-}
-
-function RoomEnvironment({ agentColor }: { agentColor: string }) {
-  const hw = ROOM_W / 2;
-  const hd = ROOM_D / 2;
-
-  return (
-    <>
-      <RoomFloor />
-      <RoomCeiling />
-      <RoomWalls agentColor={agentColor} />
-
-      {/* Corner pillars */}
-      <NeonPillar position={[-hw + 0.05, ROOM_H / 2, -hd + 0.05]} color={NEON_GREEN} />
-      <NeonPillar position={[hw - 0.05, ROOM_H / 2, -hd + 0.05]} color={NEON_GREEN} />
-      <NeonPillar position={[-hw + 0.05, ROOM_H / 2, hd - 0.05]} color={agentColor} />
-      <NeonPillar position={[hw - 0.05, ROOM_H / 2, hd - 0.05]} color={agentColor} />
-
-      {/* Holo panels on back wall */}
-      <HoloPanel position={[-2.5, 1.8, hd - 0.1]} rotation={[0, Math.PI, 0]} color={NEON_GREEN} />
-      <HoloPanel position={[2.5, 1.8, hd - 0.1]} rotation={[0, Math.PI, 0]} color={agentColor} />
-
-      {/* Holo panels on side walls */}
-      <HoloPanel position={[-hw + 0.1, 1.8, -1.5]} rotation={[0, Math.PI / 2, 0]} color={agentColor} width={1} />
-      <HoloPanel position={[hw - 0.1, 1.8, 1.5]} rotation={[0, -Math.PI / 2, 0]} color={NEON_GREEN} width={1} />
-
-      {/* Floating holo ring above agent */}
-      <HoloRing agentColor={agentColor} />
-
-      {/* Ceiling lights */}
-      <CeilingLights agentColor={agentColor} />
-    </>
+    </group>
   );
 }
 
@@ -360,12 +261,10 @@ const DEFAULT_CAM_POS: [number, number, number] = [7, 5.5, 11];
 const DEFAULT_CAM_FOV = 50;
 const DEFAULT_CAM_TARGET = new THREE.Vector3(0, 1, 0);
 
-// Camera reset helper + mobile FOV adjustment
 function CameraResetter({ controlsRef }: { controlsRef: React.RefObject<any> }) {
   const { camera } = useThree();
   const initialized = useRef(false);
 
-  // Widen FOV on mobile so the room + agent fits in the smaller viewport
   if (!initialized.current && typeof window !== 'undefined') {
     initialized.current = true;
     if (window.innerWidth < 768 && (camera as THREE.PerspectiveCamera).fov) {
@@ -422,24 +321,22 @@ export default function AgentShowcase3D({ modelPath, agentColor, agentName }: Ag
           gl={{ antialias: true, alpha: true, failIfMajorPerformanceCaveat: false }}
           style={{ background: 'transparent' }}
           onCreated={(state) => {
-            state.gl.setClearColor('#040404', 1);
+            state.gl.setClearColor('#020202', 1);
           }}
           onError={() => setError(true)}
         >
-          {/* Global lighting */}
-          <ambientLight intensity={0.4} />
+          <ambientLight intensity={0.5} />
           <directionalLight position={[3, 8, 5]} intensity={0.8} color="#ffffff" />
           <directionalLight position={[-3, 5, -3]} intensity={0.3} color="#ffffff" />
           <pointLight color={agentColor} intensity={1.2} distance={8} position={[0, 3, 2]} />
           <hemisphereLight args={['#1a2a1a', '#0a0a0a', 0.4]} />
 
-          <fog attach="fog" args={['#040404', 18, 35]} />
+          <fog attach="fog" args={['#020202', 14, 28]} />
 
           <Suspense fallback={null}>
-            {/* Room environment */}
-            <RoomEnvironment agentColor={agentColor} />
-
-            {/* Agent platform + model */}
+            <MatrixFloor />
+            <MatrixRain />
+            <MatrixStreams />
             <FloorPlatform agentColor={agentColor} />
             <ShowcaseAgent modelPath={modelPath} agentColor={agentColor} />
           </Suspense>
@@ -451,7 +348,7 @@ export default function AgentShowcase3D({ modelPath, agentColor, agentName }: Ag
             enablePan={false}
             enableZoom={true}
             minDistance={6}
-            maxDistance={16}
+            maxDistance={20}
             maxPolarAngle={Math.PI / 2.3}
             minPolarAngle={Math.PI / 6}
             target={[0, 1, 0]}
@@ -460,7 +357,6 @@ export default function AgentShowcase3D({ modelPath, agentColor, agentName }: Ag
         </Canvas>
       </Suspense>
 
-      {/* Reset camera button */}
       <button
         onClick={handleResetCamera}
         className="absolute bottom-3 right-3 cursor-pointer font-mono"
