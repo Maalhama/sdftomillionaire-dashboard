@@ -137,7 +137,7 @@ export default function HomePage() {
                 <Play className="w-4 h-4" />
                 observer le stage
               </Link>
-              <Link href="/about" className="btn-secondary flex items-center gap-2">
+              <Link href="/agents" className="btn-secondary flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 voir les agents
               </Link>

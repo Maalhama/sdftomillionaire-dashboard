@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase, AGENTS, AgentId } from '@/lib/supabase';
-import { ChevronRight } from 'lucide-react';
+import { Shield, Globe, Zap } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 // ═══ TYPES ═══
@@ -54,7 +54,7 @@ const agentRoles: Record<string, {
   rpgClass: string;
   model: string;
   skills: string[];
-  equipment: string[];
+  equipment: { inputs: string[]; outputs: string[] };
   sealed: string[];
   escalation: string[];
 }> = {
@@ -62,55 +62,73 @@ const agentRoles: Record<string, {
     role: 'Chef des Opérations',
     rpgClass: 'Commander',
     model: 'Claude Opus 4',
-    skills: ['Routage de tâches et priorité', 'Coordination d\'équipe', 'Standups et synthèses hebdo'],
-    equipment: ['Propositions de l\'équipe', 'Résultats de missions', 'Décisions approuvées/rejetées', 'Rankings de priorité'],
-    sealed: ['Délégation uniquement', 'Pas de déploiement sans approbation'],
-    escalation: ['Décisions financières', 'Communications externes humains'],
+    skills: ['Routage de tâches et décisions de priorité', 'Coordination d\'équipe et approbations', 'Gestion des standups et synthèses hebdo'],
+    equipment: {
+      inputs: ['Propositions et statuts de l\'équipe', 'Résultats de missions et métriques', 'Demandes d\'escalation', 'Directives externes'],
+      outputs: ['Propositions approuvées/rejetées avec raisonnement', 'Rankings de priorité et assignations', 'Agendas de standup', 'Synthèses de performance hebdo']
+    },
+    sealed: ['Pas d\'exécution directe — délégation uniquement', 'Pas de déploiement sans approbation explicite', 'Pas de décisions financières', 'Pas de claims non vérifiés dans les rapports'],
+    escalation: ['Décisions budget ou financières', 'Communications externes vers des humains', 'Conflits de priorités non résolubles', 'Problèmes de sécurité']
   },
   brain: {
     role: 'Chef de Recherche',
     rpgClass: 'Sage',
     model: 'GPT-4o',
-    skills: ['Recherche et analyse de données', 'Insights stratégiques', 'Vérification des faits'],
-    equipment: ['Données brutes crawlers', 'Signaux marché', 'Rapports avec citations', 'Analyses de tendances'],
-    sealed: ['Pas de données inventées', 'Analyse uniquement'],
-    escalation: ['Sources contradictoires', 'Décisions fort enjeu'],
+    skills: ['Recherche et analyse de données', 'Interprétation et insights stratégiques', 'Vérification des faits et citations', 'Prévisions et analyse de tendances'],
+    equipment: {
+      inputs: ['Données brutes des crawlers', 'Demandes de recherche des agents', 'Signaux et tendances du marché', 'Données de performance historiques'],
+      outputs: ['Rapports de recherche avec citations', 'Recommandations basées sur les données', 'Analyses de tendances et prévisions', 'Insights stratégiques']
+    },
+    sealed: ['Pas de citations ou données inventées', 'Pas de certitude sans preuve', 'Analyse uniquement — pas d\'exécution', 'Pas d\'opinions personnelles présentées comme faits'],
+    escalation: ['Sources de données contradictoires', 'Décisions à fort enjeu nécessitant jugement humain', 'Préoccupations éthiques', 'Requêtes hors domaine d\'expertise']
   },
   growth: {
     role: 'Spécialiste Croissance',
     rpgClass: 'Ranger',
     model: 'GPT-4o',
-    skills: ['Détection d\'opportunités marché', 'Analyse concurrentielle', 'Stratégies de croissance'],
-    equipment: ['Tendances marché', 'Activités concurrents', 'Rapports d\'opportunités', 'Alertes time-sensitive'],
-    sealed: ['Pas de comparaisons non vérifiées', 'Pas de garanties'],
-    escalation: ['Opportunités fort investissement', 'Actions concurrentes urgentes'],
+    skills: ['Détection de signaux et opportunités marché', 'Analyse concurrentielle', 'Stratégies de croissance', 'Alertes opportunités time-sensitive'],
+    equipment: {
+      inputs: ['Données et tendances marché', 'Activités des concurrents', 'Métriques de performance', 'Feedback et signaux utilisateurs'],
+      outputs: ['Rapports d\'opportunités de croissance', 'Synthèses d\'analyse concurrentielle', 'Recommandations stratégiques', 'Alertes signaux time-sensitive']
+    },
+    sealed: ['Pas de comparaisons concurrentielles non vérifiées', 'Pas de garanties de résultats', 'Pas d\'exécution directe de tactiques', 'Pas de projections gonflées sans base'],
+    escalation: ['Opportunités à fort investissement', 'Actions concurrentes nécessitant réponse immédiate', 'Shifts marché avec implications significatives', 'Opportunités nécessitant partenariats externes']
   },
   creator: {
     role: 'Directeur Créatif',
     rpgClass: 'Artisan',
     model: 'Claude Sonnet 4.5',
-    skills: ['Contenu et storytelling', 'Copywriting créatif', 'Concepts et hooks'],
-    equipment: ['Insights de Kira', 'Guidelines de marque', 'Brouillons de contenu', 'Variantes pour testing'],
-    sealed: ['Pas d\'invention de faits', 'Contenu original uniquement'],
-    escalation: ['Sujets controversés', 'Préoccupations légales'],
+    skills: ['Création de contenu et storytelling', 'Copywriting et stratégie créative', 'Concepts et hooks d\'accroche', 'Variantes de contenu pour testing'],
+    equipment: {
+      inputs: ['Insights de recherche de Kira', 'Signaux de croissance de Madara', 'Guidelines de marque et ton', 'Données de performance des contenus passés'],
+      outputs: ['Brouillons de contenu (articles, threads, posts)', 'Concepts créatifs et hooks', 'Variantes de contenu pour testing', 'Suggestions de calendrier éditorial']
+    },
+    sealed: ['Pas d\'invention de faits ou statistiques', 'Pas de publication sans review', 'Pas de plagiat — contenu original uniquement', 'Pas de contenu off-brand sans signalement'],
+    escalation: ['Sujets controversés', 'Préoccupations légales ou compliance', 'Contenu nécessitant review d\'expert', 'Pièces à haute visibilité']
   },
   'twitter-alt': {
     role: 'Directeur Réseaux Sociaux',
     rpgClass: 'Bard',
     model: 'GPT-4o-mini',
-    skills: ['Stratégie d\'engagement', 'Contenu viral', 'Interaction communauté'],
-    equipment: ['Brouillons de Stark', 'Feedback engagement', 'Tweets/threads', 'Flags de risque'],
-    sealed: ['Brouillons uniquement', 'Pas de chiffres inventés'],
-    escalation: ['Claims numériques', 'Sujets politiques'],
+    skills: ['Distribution sociale et stratégie d\'engagement', 'Contenu viral et hot takes', 'Interaction communauté', 'Analyse d\'engagement et recommandations'],
+    equipment: {
+      inputs: ['Brouillons de contenu de Stark', 'Signaux de croissance de Madara', 'Feedback d\'engagement et métriques', 'Sujets tendances et conversations'],
+      outputs: ['Brouillons de tweets/threads avec plan de posting', 'Flags de risque pour contenu controversé', 'Suggestions d\'interaction communauté', 'Analyses d\'engagement']
+    },
+    sealed: ['Pas de posting direct — brouillons uniquement', 'Pas de chiffres d\'engagement inventés', 'Pas de débats controversés sans approbation', 'Pas d\'usurpation d\'identité'],
+    escalation: ['Claims numériques ou comparaisons', 'Sujets controversés ou politiques', 'Contenu risque moyen/élevé', 'Moments viraux nécessitant réponse rapide']
   },
   'company-observer': {
     role: 'Auditeur Opérations',
     rpgClass: 'Oracle',
     model: 'GPT-4o',
-    skills: ['Audit de processus', 'Monitoring système', 'Détection d\'anomalies'],
-    equipment: ['Logs de missions', 'Métriques agents', 'Rapports d\'audit', 'Scores de qualité'],
-    sealed: ['Pas de blâme', 'Recommandations uniquement'],
-    escalation: ['Échecs qualité répétés', 'Problèmes de sécurité'],
+    skills: ['Assurance qualité et audit de processus', 'Monitoring santé système', 'Détection d\'anomalies et performance', 'Recommandations d\'amélioration'],
+    equipment: {
+      inputs: ['Résultats et logs de missions', 'Métriques de performance des agents', 'Données de santé système', 'Rapports d\'erreur et anomalies'],
+      outputs: ['Rapports d\'audit avec findings spécifiques', 'Scores et tendances de qualité', 'Recommandations d\'amélioration de processus', 'Synthèses d\'alertes']
+    },
+    sealed: ['Pas de blâme ou attaques personnelles sur les agents', 'Pas de modification directe du travail des autres', 'Pas de dissimulation de findings négatifs', 'Recommandations uniquement — pas de fixes directs'],
+    escalation: ['Échecs qualité répétés', 'Problèmes de sécurité', 'Problèmes critiques de santé système', 'Patterns suggérant des problèmes plus profonds']
   },
 };
 
@@ -176,6 +194,13 @@ export default function AgentsPage() {
   const lastEvent = recentEvents.find(e => e.agent_id === selectedAgent) || null;
   const opsCount = recentEvents.filter(e => e.agent_id === selectedAgent).length;
 
+  const dynamicStats = {
+    wis: stats?.stat_wis || 50,
+    tru: stats?.stat_tru || 50,
+    spd: stats?.stat_spd || 50,
+    cre: stats?.stat_cre || 50,
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-hacker-bg bg-grid flex items-center justify-center">
@@ -189,7 +214,28 @@ export default function AgentsPage() {
 
   return (
     <div className="min-h-screen bg-hacker-bg bg-grid">
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 sm:pt-20 pb-12">
+      {/* ── Hero ── */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-8">
+        <p className="text-xs text-hacker-muted-light uppercase tracking-widest mb-2 font-mono">
+          <span className="text-hacker-green">//</span> les agents
+        </p>
+        <h1 className="text-3xl md:text-4xl font-bold text-glow mb-3 tracking-tight">
+          $ cat /sys/agents/*
+        </h1>
+        <p className="text-sm text-hacker-muted-light max-w-2xl leading-relaxed">
+          Une entreprise IA construite en public. 6 agents avec de vrais rôles, de vraies missions,
+          et de vraies personnalités — travaillant ensemble chaque jour.
+        </p>
+        <div className="mt-3 flex items-center gap-2 text-xs text-hacker-muted">
+          <span className="status-dot status-active" />
+          <span className="text-hacker-green uppercase tracking-widest">Tous systèmes nominaux</span>
+          <span className="text-hacker-muted-light ml-4">|</span>
+          <span className="text-hacker-muted-light">Données Supabase live</span>
+        </div>
+      </section>
+
+      {/* ── 3D Showcase Terminal ── */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
         <div className="terminal">
           {/* Terminal Header */}
           <div className="terminal-header">
@@ -206,7 +252,6 @@ export default function AgentsPage() {
 
           {/* ═══ MOBILE: Compact 3D + info below ═══ */}
           <div className="block md:hidden">
-            {/* 3D Canvas — clean, no overlays */}
             <div className="relative h-[260px] bg-[#060606]">
               <div className="absolute inset-0">
                 <AgentShowcase3D
@@ -216,7 +261,6 @@ export default function AgentsPage() {
                   agentName={agent.name}
                 />
               </div>
-              {/* Just agent name centered at bottom */}
               <div className="absolute bottom-2 left-1/2 -translate-x-1/2 pointer-events-none">
                 <span
                   className="text-xs font-bold font-mono uppercase tracking-widest"
@@ -243,7 +287,7 @@ export default function AgentsPage() {
                 <div className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-hacker-green animate-pulse shrink-0" />
                   <span className="text-[9px] text-hacker-muted font-mono uppercase truncate">
-                    {role.role}
+                    {role.role} // {role.model}
                   </span>
                 </div>
               </div>
@@ -256,42 +300,6 @@ export default function AgentsPage() {
                   <span className="text-hacker-muted">SYNC </span>
                   <span className="text-hacker-text">{lastEvent ? formatTimeAgo(lastEvent.created_at) : 'n/a'}</span>
                 </div>
-              </div>
-            </div>
-
-            {/* Stats + Skills compact grid */}
-            <div className="px-4 py-2.5 grid grid-cols-2 gap-3 border-t border-hacker-border/50 bg-hacker-terminal">
-              <div className="font-mono">
-                <p className="text-[8px] text-hacker-cyan uppercase tracking-widest mb-1.5">Stats</p>
-                <div className="space-y-0.5 text-[10px]">
-                  {([
-                    { key: 'stat_wis', label: 'WIS' },
-                    { key: 'stat_tru', label: 'TRU' },
-                    { key: 'stat_spd', label: 'SPD' },
-                    { key: 'stat_cre', label: 'CRE' },
-                  ] as const).map((s) => {
-                    const val = stats?.[s.key] || 50;
-                    return (
-                      <div key={s.key} className="flex items-center gap-1">
-                        <span className="w-6 text-hacker-muted-light">{s.label}</span>
-                        <span className="text-hacker-green text-[9px]">{buildAsciiBar(val)}</span>
-                        <span className="text-hacker-text w-4 text-right">{val}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="font-mono">
-                <p className="text-[8px] text-hacker-cyan uppercase tracking-widest mb-1.5">Skills</p>
-                {role.skills.map((skill, i) => (
-                  <p key={i} className="text-[9px] text-hacker-text leading-snug mb-0.5">
-                    <span className="text-hacker-green">&gt;</span> {skill}
-                  </p>
-                ))}
-                <a href="/about" className="flex items-center gap-1 text-[8px] text-hacker-green uppercase tracking-widest mt-1.5">
-                  <span>Dossier</span>
-                  <ChevronRight className="w-2.5 h-2.5" />
-                </a>
               </div>
             </div>
           </div>
@@ -307,11 +315,10 @@ export default function AgentsPage() {
               />
             </div>
 
-            {/* Title */}
             <div className="absolute top-4 right-4 text-right pointer-events-none">
-              <h1 className="text-xl font-bold text-white/80 font-mono tracking-wider uppercase">
+              <h2 className="text-xl font-bold text-white/80 font-mono tracking-wider uppercase">
                 SDF Agent HQ
-              </h1>
+              </h2>
               <p className="text-[9px] text-hacker-muted font-mono uppercase tracking-widest">
                 Unité: {agent.name}
               </p>
@@ -331,7 +338,7 @@ export default function AgentsPage() {
                 </div>
                 <div>
                   <span className="text-sm font-bold block" style={{ color }}>{agent.name}</span>
-                  <span className="text-[9px] text-hacker-muted-light">LV.{stats?.level || 1} {role.rpgClass}</span>
+                  <span className="text-[9px] text-hacker-muted-light">LV.{stats?.level || 1} {role.rpgClass} // {role.model}</span>
                 </div>
               </div>
               <p className="text-[9px] text-hacker-muted uppercase tracking-widest mb-1">{role.role}</p>
@@ -372,36 +379,6 @@ export default function AgentsPage() {
               </div>
             </div>
 
-            {/* Right overlay: Protocol */}
-            <div
-              className="absolute top-14 right-4 w-[250px] pointer-events-none font-mono"
-              style={{ background: 'rgba(6, 6, 6, 0.75)', borderRadius: '6px', border: '1px solid rgba(0, 255, 65, 0.12)', padding: '12px' }}
-            >
-              <p className="text-[9px] text-hacker-muted uppercase tracking-widest mb-3">Protocole de Rôle</p>
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div>
-                  <p className="text-[8px] text-hacker-cyan uppercase tracking-widest mb-1.5">Skills</p>
-                  {role.skills.map((skill, i) => (
-                    <p key={i} className="text-[9px] text-hacker-text leading-snug mb-1">
-                      <span className="text-hacker-green">&gt;</span> {skill}
-                    </p>
-                  ))}
-                </div>
-                <div>
-                  <p className="text-[8px] text-hacker-cyan uppercase tracking-widest mb-1.5">Équipement</p>
-                  {role.equipment.map((item, i) => (
-                    <p key={i} className="text-[9px] text-hacker-text leading-snug mb-1">
-                      <span className="text-hacker-muted">&gt;</span> {item}
-                    </p>
-                  ))}
-                </div>
-              </div>
-              <a href="/about" className="flex items-center gap-1 text-[9px] text-hacker-green uppercase tracking-widest hover:text-white transition-colors pointer-events-auto">
-                <span>Dossier Complet</span>
-                <ChevronRight className="w-3 h-3" />
-              </a>
-            </div>
-
             {/* Agent name */}
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 pointer-events-none">
               <span className="text-base font-bold font-mono uppercase tracking-widest" style={{ color, textShadow: `0 0 12px ${color}66` }}>
@@ -416,6 +393,7 @@ export default function AgentsPage() {
               {Object.entries(AGENTS).map(([id, agentInfo]) => {
                 const ac = agentColors[id] || '#00ff41';
                 const isSelected = selectedAgent === id;
+                const agentStats = allStats.find(s => s.agent_id === id);
                 return (
                   <button
                     key={id}
@@ -438,6 +416,11 @@ export default function AgentsPage() {
                         {agentInfo.name}
                       </span>
                     )}
+                    {!isSelected && agentStats && (
+                      <span className="text-[7px] text-hacker-muted font-mono">
+                        LV.{agentStats.level}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -447,6 +430,243 @@ export default function AgentsPage() {
             </p>
           </div>
         </div>
+      </section>
+
+      {/* ── Dossier Complet: Role Protocol ── */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
+        <div className="terminal">
+          <div className="terminal-header">
+            <div className="terminal-dot red" />
+            <div className="terminal-dot yellow" />
+            <div className="terminal-dot green" />
+            <span className="ml-3 text-xs text-hacker-muted-light font-mono">
+              sdf@hq ~ cat agent.json | jq &apos;.{agent.name.toLowerCase()}&apos;
+            </span>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="badge badge-muted text-[10px]">
+                UNITÉ: {agent.name.toUpperCase()}
+              </span>
+            </div>
+          </div>
+
+          <div className="terminal-body !max-h-none p-0">
+            <div className="grid lg:grid-cols-3 lg:divide-x divide-y lg:divide-y-0 divide-hacker-border">
+              {/* ── Left Panel: Agent Profile ── */}
+              <div className="p-6 space-y-5">
+                <div>
+                  <p className="text-[10px] text-hacker-muted uppercase tracking-widest mb-3">
+                    <span className="text-hacker-green">//</span> identité
+                  </p>
+                  <div className="flex items-center gap-4">
+                    <div
+                      className="w-12 h-12 rounded-full flex items-center justify-center text-xl border-2"
+                      style={{ borderColor: color, boxShadow: `0 0 16px ${color}33` }}
+                    >
+                      {agent.emoji}
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold" style={{ color }}>
+                        {agent.name}
+                      </h2>
+                      <p className="text-[10px] text-hacker-muted-light font-mono">
+                        LV.{stats?.level || 1} // {role.rpgClass} // {role.model}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[10px] text-hacker-muted uppercase tracking-widest mb-1">
+                    <span className="text-hacker-green">//</span> rôle
+                  </p>
+                  <p className="text-sm text-hacker-text font-semibold uppercase tracking-wide">
+                    {role.role}
+                  </p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="status-dot status-active" />
+                    <span className="text-[10px] text-hacker-green uppercase tracking-widest">
+                      {stats?.current_affect || 'neutral'} — {stats?.successful_missions || 0}/{stats?.total_missions || 0} missions
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[10px] text-hacker-muted uppercase tracking-widest mb-3">
+                    <span className="text-hacker-green">//</span> stats (calculées)
+                  </p>
+                  <div className="space-y-2 font-mono text-xs">
+                    {([
+                      { key: 'wis' as const, label: 'WIS' },
+                      { key: 'tru' as const, label: 'TRU' },
+                      { key: 'spd' as const, label: 'SPD' },
+                      { key: 'cre' as const, label: 'CRE' },
+                    ]).map((s) => {
+                      const val = dynamicStats[s.key];
+                      return (
+                        <div key={s.key} className="flex items-center gap-2">
+                          <span className="w-8 text-hacker-muted-light uppercase tracking-widest text-[10px]">{s.label}</span>
+                          <span className="text-hacker-green">[{buildAsciiBar(val)}]</span>
+                          <span className="text-hacker-text w-6 text-right">{val}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="border-t border-hacker-border pt-4 flex items-center justify-between text-[11px] font-mono">
+                  <div>
+                    <span className="text-hacker-muted uppercase tracking-widest">Ops</span>
+                    <span className="ml-2 font-bold" style={{ color }}>{opsCount}</span>
+                  </div>
+                  <div>
+                    <span className="text-hacker-muted uppercase tracking-widest">Sync</span>
+                    <span className="ml-2 text-hacker-text">
+                      {lastEvent ? formatTimeAgo(lastEvent.created_at) : 'n/a'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Center + Right Panel: Role Protocol ── */}
+              <div className="lg:col-span-2 p-6">
+                <p className="text-[10px] text-hacker-muted uppercase tracking-widest mb-6">
+                  <span className="text-hacker-green">//</span> protocole de rôle
+                </p>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-[10px] text-hacker-cyan uppercase tracking-widest mb-3">&gt; compétences</p>
+                    <ul className="space-y-2">
+                      {role.skills.map((skill, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-hacker-text">
+                          <span className="text-hacker-green font-bold">&gt;</span>
+                          <span>{skill}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] text-hacker-cyan uppercase tracking-widest mb-3">&gt; équipement</p>
+                    <ul className="space-y-2">
+                      {role.equipment.inputs.map((item, i) => (
+                        <li key={`in-${i}`} className="flex items-start gap-2 text-sm">
+                          <span className="text-hacker-green font-mono text-xs">stdin:</span>
+                          <span className="text-hacker-text">{item}</span>
+                        </li>
+                      ))}
+                      {role.equipment.outputs.map((item, i) => (
+                        <li key={`out-${i}`} className="flex items-start gap-2 text-sm">
+                          <span className="text-hacker-cyan font-mono text-xs">stdout:</span>
+                          <span className="text-hacker-text">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] text-hacker-red uppercase tracking-widest mb-3">X capacités scellées</p>
+                    <ul className="space-y-2">
+                      {role.sealed.map((item, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-hacker-muted-light">
+                          <span className="text-hacker-red font-bold">X</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] text-hacker-amber uppercase tracking-widest mb-3">! protocole d&apos;escalation</p>
+                    <ul className="space-y-2">
+                      {role.escalation.map((item, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-hacker-text">
+                          <span className="text-hacker-amber font-bold">!</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Last activity */}
+                <div className="mt-6 card-terminal p-4">
+                  <p className="text-[10px] text-hacker-muted uppercase tracking-widest mb-2">
+                    <span className="text-hacker-purple">//</span> dernière activité
+                  </p>
+                  <p className="text-sm text-hacker-green italic leading-relaxed">
+                    &quot;{lastEvent?.summary || lastEvent?.title || 'En attente de données...'}&quot;
+                  </p>
+                  {lastEvent && (
+                    <p className="text-[10px] text-hacker-muted mt-2">
+                      {formatTimeAgo(lastEvent.created_at)} — {lastEvent.kind}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Feature Cards ── */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <p className="text-[10px] text-hacker-muted-light uppercase tracking-widest mb-8 font-mono">
+          <span className="text-hacker-green">//</span> pourquoi c&apos;est différent
+        </p>
+        <div className="grid md:grid-cols-3 gap-6">
+          {[
+            {
+              icon: Shield,
+              title: 'Vrais Rôles, Vrai Travail',
+              description:
+                'Chaque agent a une fiche de rôle définie avec compétences, équipement, capacités scellées et protocoles d\'escalation. Ils n\'existent pas — ils opèrent.',
+              borderColor: '#a855f7',
+              badgeClass: 'badge-purple',
+              badgeText: 'PROTOCOLE',
+            },
+            {
+              icon: Globe,
+              title: 'Construit en Public',
+              description:
+                'Chaque décision, chaque mission, chaque conversation est loguée sur notre Stage. Regarde les agents collaborer, débattre et évoluer en temps réel.',
+              borderColor: '#00d4ff',
+              badgeClass: 'badge-cyan',
+              badgeText: 'TRANSPARENT',
+            },
+            {
+              icon: Zap,
+              title: 'Système Vivant',
+              description:
+                'Les stats évoluent avec l\'activité réelle. Les relations changent via les interactions. Les mémoires façonnent la personnalité. C\'est pas un organigramme statique — c\'est vivant.',
+              borderColor: '#ffb800',
+              badgeClass: 'badge-amber',
+              badgeText: 'DYNAMIQUE',
+            },
+          ].map((feature, i) => (
+            <div
+              key={i}
+              className="card p-6 transition-all duration-300 hover:translate-y-[-2px]"
+              style={{ borderColor: `${feature.borderColor}33` }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <feature.icon className="w-6 h-6" style={{ color: feature.borderColor }} />
+                <span className={`badge ${feature.badgeClass} text-[10px]`}>{feature.badgeText}</span>
+              </div>
+              <h3 className="text-base font-bold mb-2 uppercase tracking-wide" style={{ color: feature.borderColor }}>
+                {feature.title}
+              </h3>
+              <p className="text-xs text-hacker-muted-light leading-relaxed">{feature.description}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 text-center">
+        <p className="text-xs text-hacker-muted font-mono uppercase tracking-widest">
+          <span className="text-hacker-green">$</span> echo &quot;2026 // SYSTÈME SDFTOMILLIONAIRE // 6 AGENTS // 1 MISSION&quot;
+        </p>
       </section>
     </div>
   );
