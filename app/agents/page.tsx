@@ -189,25 +189,23 @@ export default function AgentsPage() {
 
   return (
     <div className="min-h-screen bg-hacker-bg bg-grid">
-      {/* ═══ SHOWCASE TERMINAL — Single compact block ═══ */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-12">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 sm:pt-20 pb-12">
         <div className="terminal">
           {/* Terminal Header */}
           <div className="terminal-header">
             <div className="terminal-dot red" />
             <div className="terminal-dot yellow" />
             <div className="terminal-dot green" />
-            <span className="ml-3 text-xs text-hacker-muted-light font-mono">
-              sdf@hq ~ showcase /agents/{selectedAgent}
+            <span className="ml-3 text-[10px] sm:text-xs text-hacker-muted-light font-mono truncate">
+              sdf@hq ~ /agents/{selectedAgent}
             </span>
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-2 shrink-0">
               <span className="badge badge-live text-[10px]">LIVE</span>
             </div>
           </div>
 
-          {/* ═══ 3D CANVAS + OVERLAYS ═══ */}
-          <div className="relative h-[420px] sm:h-[460px] bg-[#060606]">
-            {/* 3D Canvas — full area */}
+          {/* ═══ 3D CANVAS ═══ */}
+          <div className="relative h-[280px] sm:h-[380px] md:h-[460px] bg-[#060606]">
             <div className="absolute inset-0">
               <AgentShowcase3D
                 key={selectedAgent}
@@ -217,22 +215,21 @@ export default function AgentsPage() {
               />
             </div>
 
-            {/* ── TOP-RIGHT: Title ── */}
-            <div className="absolute top-4 right-4 text-right pointer-events-none">
-              <h1 className="text-lg sm:text-xl font-bold text-white/80 font-mono tracking-wider uppercase">
+            {/* ── TOP-RIGHT: Title (desktop) ── */}
+            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 text-right pointer-events-none">
+              <h1 className="text-sm sm:text-lg md:text-xl font-bold text-white/80 font-mono tracking-wider uppercase">
                 SDF Agent HQ
               </h1>
-              <p className="text-[9px] text-hacker-muted font-mono uppercase tracking-widest">
+              <p className="text-[8px] sm:text-[9px] text-hacker-muted font-mono uppercase tracking-widest">
                 Unité: {agent.name}
               </p>
             </div>
 
-            {/* ── LEFT OVERLAY: Stats ── */}
+            {/* ── LEFT OVERLAY: Stats (desktop only) ── */}
             <div
-              className="absolute top-4 left-4 w-[200px] sm:w-[220px] pointer-events-none font-mono"
+              className="absolute top-4 left-4 w-[220px] pointer-events-none font-mono hidden md:block"
               style={{ background: 'rgba(6, 6, 6, 0.75)', borderRadius: '6px', border: '1px solid rgba(0, 255, 65, 0.12)', padding: '12px' }}
             >
-              {/* Identity */}
               <div className="flex items-center gap-2.5 mb-2">
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center text-base border"
@@ -245,19 +242,13 @@ export default function AgentsPage() {
                   <span className="text-[9px] text-hacker-muted-light">LV.{stats?.level || 1} {role.rpgClass}</span>
                 </div>
               </div>
-
-              {/* Role + status */}
-              <p className="text-[9px] text-hacker-muted uppercase tracking-widest mb-1">
-                {role.role}
-              </p>
+              <p className="text-[9px] text-hacker-muted uppercase tracking-widest mb-1">{role.role}</p>
               <div className="flex items-center gap-1.5 mb-3">
                 <span className="w-1.5 h-1.5 rounded-full bg-hacker-green animate-pulse" />
                 <span className="text-[9px] text-hacker-green uppercase tracking-widest">
                   {stats?.current_affect || 'neutral'} — {stats?.successful_missions || 0}/{stats?.total_missions || 0} ops
                 </span>
               </div>
-
-              {/* Stat Bars */}
               <div className="space-y-1 text-[10px] mb-3">
                 {([
                   { key: 'stat_wis', label: 'WIS' },
@@ -275,8 +266,6 @@ export default function AgentsPage() {
                   );
                 })}
               </div>
-
-              {/* Ops / Sync */}
               <div className="border-t border-hacker-green/10 pt-2 flex items-center justify-between text-[9px]">
                 <div>
                   <span className="text-hacker-muted">OPS </span>
@@ -291,16 +280,14 @@ export default function AgentsPage() {
               </div>
             </div>
 
-            {/* ── RIGHT OVERLAY: Role Protocol ── */}
+            {/* ── RIGHT OVERLAY: Role Protocol (desktop only) ── */}
             <div
-              className="absolute top-14 right-4 w-[220px] sm:w-[250px] pointer-events-none font-mono hidden md:block"
+              className="absolute top-14 right-4 w-[250px] pointer-events-none font-mono hidden md:block"
               style={{ background: 'rgba(6, 6, 6, 0.75)', borderRadius: '6px', border: '1px solid rgba(0, 255, 65, 0.12)', padding: '12px' }}
             >
               <p className="text-[9px] text-hacker-muted uppercase tracking-widest mb-3">
                 Protocole de Rôle
               </p>
-
-              {/* Skills + Equipment side by side */}
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <p className="text-[8px] text-hacker-cyan uppercase tracking-widest mb-1.5">Skills</p>
@@ -319,8 +306,6 @@ export default function AgentsPage() {
                   ))}
                 </div>
               </div>
-
-              {/* CTA */}
               <a
                 href="/about"
                 className="flex items-center gap-1 text-[9px] text-hacker-green uppercase tracking-widest hover:text-white transition-colors pointer-events-auto"
@@ -333,7 +318,7 @@ export default function AgentsPage() {
             {/* ── BOTTOM: Agent name label ── */}
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 pointer-events-none">
               <span
-                className="text-sm sm:text-base font-bold font-mono uppercase tracking-widest"
+                className="text-xs sm:text-sm md:text-base font-bold font-mono uppercase tracking-widest"
                 style={{ color, textShadow: `0 0 12px ${color}66` }}
               >
                 {agent.name}
@@ -341,9 +326,86 @@ export default function AgentsPage() {
             </div>
           </div>
 
+          {/* ═══ MOBILE: Stats + Protocol (below canvas) ═══ */}
+          <div className="md:hidden border-t border-hacker-border bg-hacker-terminal">
+            {/* Agent identity bar */}
+            <div className="px-4 py-3 flex items-center gap-3 border-b border-hacker-border/50">
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center text-lg border-2 shrink-0"
+                style={{ borderColor: color, boxShadow: `0 0 10px ${color}33` }}
+              >
+                {agent.emoji}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold font-mono" style={{ color }}>{agent.name}</span>
+                  <span className="text-[9px] text-hacker-muted-light font-mono">LV.{stats?.level || 1} {role.rpgClass}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-hacker-green animate-pulse shrink-0" />
+                  <span className="text-[9px] text-hacker-muted font-mono uppercase truncate">
+                    {role.role} — {stats?.current_affect || 'neutral'}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right shrink-0 font-mono">
+                <div className="text-[9px]">
+                  <span className="text-hacker-muted">OPS </span>
+                  <span style={{ color }}>{opsCount}</span>
+                </div>
+                <div className="text-[9px]">
+                  <span className="text-hacker-muted">SYNC </span>
+                  <span className="text-hacker-text">{lastEvent ? formatTimeAgo(lastEvent.created_at) : 'n/a'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Stats bars + Protocol in 2 columns */}
+            <div className="px-4 py-3 grid grid-cols-2 gap-4">
+              {/* Stats column */}
+              <div className="font-mono">
+                <p className="text-[8px] text-hacker-cyan uppercase tracking-widest mb-2">Stats</p>
+                <div className="space-y-1 text-[10px]">
+                  {([
+                    { key: 'stat_wis', label: 'WIS' },
+                    { key: 'stat_tru', label: 'TRU' },
+                    { key: 'stat_spd', label: 'SPD' },
+                    { key: 'stat_cre', label: 'CRE' },
+                  ] as const).map((s) => {
+                    const val = stats?.[s.key] || 50;
+                    return (
+                      <div key={s.key} className="flex items-center gap-1">
+                        <span className="w-6 text-hacker-muted-light">{s.label}</span>
+                        <span className="text-hacker-green text-[9px]">{buildAsciiBar(val)}</span>
+                        <span className="text-hacker-text w-4 text-right">{val}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Skills column */}
+              <div className="font-mono">
+                <p className="text-[8px] text-hacker-cyan uppercase tracking-widest mb-2">Skills</p>
+                {role.skills.map((skill, i) => (
+                  <p key={i} className="text-[9px] text-hacker-text leading-snug mb-1">
+                    <span className="text-hacker-green">&gt;</span> {skill}
+                  </p>
+                ))}
+                <a
+                  href="/about"
+                  className="flex items-center gap-1 text-[8px] text-hacker-green uppercase tracking-widest mt-2"
+                >
+                  <span>Dossier Complet</span>
+                  <ChevronRight className="w-2.5 h-2.5" />
+                </a>
+              </div>
+            </div>
+          </div>
+
           {/* ═══ AGENT SELECTOR ═══ */}
-          <div className="border-t border-hacker-border px-4 py-3 bg-hacker-terminal flex items-center justify-between">
-            <div className="flex items-center gap-4 sm:gap-5 overflow-x-auto">
+          <div className="border-t border-hacker-border px-3 sm:px-4 py-2.5 sm:py-3 bg-hacker-terminal flex items-center justify-between">
+            <div className="flex items-center gap-3 sm:gap-5 overflow-x-auto">
               {Object.entries(AGENTS).map(([id, agentInfo]) => {
                 const ac = agentColors[id] || '#00ff41';
                 const isSelected = selectedAgent === id;
@@ -356,7 +418,7 @@ export default function AgentsPage() {
                     }`}
                   >
                     <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-base border-2 transition-all"
+                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-sm sm:text-base border-2 transition-all"
                       style={{
                         borderColor: isSelected ? ac : 'transparent',
                         boxShadow: isSelected ? `0 0 12px ${ac}44` : 'none',
@@ -365,7 +427,7 @@ export default function AgentsPage() {
                       {agentInfo.emoji}
                     </div>
                     {isSelected && (
-                      <span className="text-[8px] font-mono font-bold uppercase tracking-widest" style={{ color: ac }}>
+                      <span className="text-[7px] sm:text-[8px] font-mono font-bold uppercase tracking-widest" style={{ color: ac }}>
                         {agentInfo.name}
                       </span>
                     )}
