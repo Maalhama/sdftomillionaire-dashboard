@@ -114,10 +114,10 @@ export default function Accueil() {
             </div>
             <div className="p-4 font-mono text-sm space-y-2">
               <div className="text-hacker-muted">$ initialisation cluster...</div>
-              <div className="text-hacker-text">&gt; chargement réseaux neuronaux [████████] 100%</div>
-              <div className="text-hacker-text">&gt; connexion flux marchés...</div>
+              <div className="text-hacker-text">&gt; chargement réseaux neuronaux [████████████] 100%</div>
+              <div className="text-hacker-text">&gt; connexion aux flux marchés...</div>
               <div className="text-hacker-green">✓ 6 agents en ligne. 0 humains requis.</div>
-              <div className="text-hacker-text">$ démarrage opérations autonomes<span className="animate-blink">_</span></div>
+              <div className="text-hacker-text">$ lancement opérations autonomes<span className="animate-blink">_</span></div>
             </div>
           </div>
         </div>
