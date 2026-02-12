@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
+
+const ASCII_LOGO = ` ███████╗██████╗ ███████╗
+ ██╔════╝██╔══██╗██╔════╝
+ ███████╗██║  ██║█████╗
+ ╚════██║██║  ██║██╔══╝
+ ███████║██████╔╝██║
+ ╚══════╝╚═════╝ ╚═╝`;
 import { supabase, AGENTS, AgentId } from '@/lib/supabase';
 import { Shield, Globe, Zap } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -325,11 +332,12 @@ export default function AgentsPage() {
               />
             </div>
 
-            <div className="absolute top-4 right-4 text-right pointer-events-none">
-              <h2 className="text-xl font-bold text-white/80 font-mono tracking-wider uppercase">
-                SDF Agent HQ
-              </h2>
-              <p className="text-[9px] text-hacker-muted font-mono uppercase tracking-widest">
+            <div className="absolute top-3 right-4 text-right pointer-events-none">
+              <pre className="text-hacker-green text-[6px] leading-tight opacity-50 font-mono">{ASCII_LOGO}</pre>
+              <p className="text-[10px] text-hacker-green/70 font-mono font-bold uppercase tracking-[0.25em] mt-1">
+                TO MILLIONAIRE
+              </p>
+              <p className="text-[8px] text-hacker-muted font-mono uppercase tracking-widest mt-0.5">
                 Unité: {agent.name}
               </p>
             </div>
