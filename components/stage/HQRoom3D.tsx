@@ -78,79 +78,79 @@ const agentConfigs = [
   {
     id: 'opus',
     name: 'CEO',
-    role: 'CEO // Opus 4',
+    role: 'CEO // Chef des Opérations',
     model: '/models/minion.glb',
     hasModel: true,
     deskIndex: 4,
     position: deskPositions[4],
     rotation: [0, 90, 0] as [number, number, number],
     status: 'active' as const,
-    color: '#ffb800',
+    color: '#f59e0b',
     thought: 'Review des propositions...',
   },
   {
     id: 'brain',
     name: 'KIRA',
-    role: 'RESEARCH // Brain',
+    role: 'KIRA // Chef de Recherche',
     model: '/models/sage.glb',
     hasModel: true,
     deskIndex: 1,
     position: deskPositions[1],
     rotation: [0, 90, 0] as [number, number, number],
     status: 'working' as const,
-    color: '#a855f7',
+    color: '#8b5cf6',
     thought: 'Validation des findings',
   },
   {
     id: 'growth',
     name: 'MADARA',
-    role: 'GROWTH // Madara',
+    role: 'MADARA // Spécialiste Croissance',
     model: '/models/scout.glb',
     hasModel: true,
     deskIndex: 2,
     position: deskPositions[2],
     rotation: [0, 90, 0] as [number, number, number],
     status: 'idle' as const,
-    color: '#00ff41',
+    color: '#22c55e',
     thought: 'En attente ; prochain: Standup',
   },
   {
     id: 'creator',
     name: 'STARK',
-    role: 'CREATIVE // Stark',
+    role: 'STARK // Directeur Créatif',
     model: '/models/quill.glb',
     hasModel: true,
     deskIndex: 3,
     position: deskPositions[3],
     rotation: [0, 90, 0] as [number, number, number],
     status: 'idle' as const,
-    color: '#00d4ff',
+    color: '#ec4899',
     thought: 'Brainstorm headlines',
   },
   {
     id: 'twitter-alt',
     name: 'L',
-    role: 'SOCIAL // Twitter',
+    role: 'L // Directeur Réseaux Sociaux',
     model: '/models/xalt.glb',
     hasModel: true,
     deskIndex: 0,
     position: deskPositions[0],
     rotation: [0, 90, 0] as [number, number, number],
     status: 'idle' as const,
-    color: '#ff3e3e',
+    color: '#3b82f6',
     thought: 'Review coordination auto',
   },
   {
     id: 'company-observer',
     name: 'USOPP',
-    role: 'ANALYTICS // Usopp',
+    role: 'USOPP // Auditeur Opérations',
     model: '/models/observer.glb',
     hasModel: true,
     deskIndex: 5,
     position: deskPositions[5],
     rotation: [0, 90, 0] as [number, number, number],
     status: 'sync' as const,
-    color: '#ff6b35',
+    color: '#ef4444',
     thought: 'Surveillance active',
   },
 ];
@@ -669,7 +669,13 @@ function CameraResetter({ controlsRef }: { controlsRef: React.RefObject<any> }) 
   return null;
 }
 
-export default function HQRoom3D() {
+export interface AgentLiveData {
+  id: string;
+  status: 'active' | 'working' | 'idle' | 'sync';
+  thought: string;
+}
+
+export default function HQRoom3D({ liveAgents }: { liveAgents?: AgentLiveData[] }) {
   const controlsRef = useRef<any>(null);
 
   const handleResetCamera = useCallback(() => {
@@ -677,6 +683,15 @@ export default function HQRoom3D() {
       (window as any).__resetStageCamera();
     }
   }, []);
+
+  // Merge live data into agent configs
+  const mergedConfigs = agentConfigs.map(config => {
+    const live = liveAgents?.find(a => a.id === config.id);
+    if (live) {
+      return { ...config, status: live.status, thought: live.thought };
+    }
+    return config;
+  });
 
   return (
     <Room3DErrorBoundary>
@@ -716,7 +731,7 @@ export default function HQRoom3D() {
           <MeetingTable position={MEETING_TABLE_POS} />
 
           {/* Agents */}
-          {agentConfigs.map((config, index) => (
+          {mergedConfigs.map((config, index) => (
             <AgentStation
               key={config.id}
               config={config}

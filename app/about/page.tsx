@@ -38,6 +38,7 @@ const agentColors: Record<string, string> = {
 // Role definitions (static - these define what each agent CAN do)
 const agentRoles: Record<string, {
   role: string;
+  rpgClass: string;
   model: string;
   skills: string[];
   equipment: { inputs: string[]; outputs: string[] };
@@ -46,69 +47,75 @@ const agentRoles: Record<string, {
 }> = {
   opus: {
     role: 'Chef des Opérations',
+    rpgClass: 'Commander',
     model: 'Claude Opus 4',
-    skills: ['Coordination stratégique', 'Délégation de tâches', 'Gestion des priorités'],
+    skills: ['Routage de tâches et décisions de priorité', 'Coordination d\'équipe et approbations', 'Gestion des standups et synthèses hebdo'],
     equipment: {
-      inputs: ['Statuts des agents', 'Propositions de missions', 'Alertes de conflits'],
-      outputs: ['Missions approuvées', 'Rankings de priorité', 'Rapports de statut']
+      inputs: ['Propositions et statuts de l\'équipe', 'Résultats de missions et métriques', 'Demandes d\'escalation', 'Directives externes'],
+      outputs: ['Propositions approuvées/rejetées avec raisonnement', 'Rankings de priorité et assignations', 'Agendas de standup', 'Synthèses de performance hebdo']
     },
-    sealed: ['Pas d\'exécution de code directe', 'Pas d\'appels API externes', 'Pas de transactions financières'],
-    escalation: ['Décisions budget > 100€', 'Communications publiques', 'Changements sécurité']
+    sealed: ['Pas d\'exécution directe — délégation uniquement', 'Pas de déploiement sans approbation explicite', 'Pas de décisions financières', 'Pas de claims non vérifiés dans les rapports'],
+    escalation: ['Décisions budget ou financières', 'Communications externes vers des humains', 'Conflits de priorités non résolubles', 'Problèmes de sécurité']
   },
   brain: {
     role: 'Chef de Recherche',
+    rpgClass: 'Sage',
     model: 'GPT-4o',
-    skills: ['Analyse approfondie', 'Vérification des faits', 'Reconnaissance de patterns', 'Synthèse de recherche'],
+    skills: ['Recherche et analyse de données', 'Interprétation et insights stratégiques', 'Vérification des faits et citations', 'Prévisions et analyse de tendances'],
     equipment: {
-      inputs: ['Sources de données brutes', 'Claims à vérifier', 'Questions de recherche'],
-      outputs: ['Insights vérifiés', 'Résumés de recherche', 'Mises à jour de connaissance']
+      inputs: ['Données brutes des crawlers', 'Demandes de recherche des agents', 'Signaux et tendances du marché', 'Données de performance historiques'],
+      outputs: ['Rapports de recherche avec citations', 'Recommandations basées sur les données', 'Analyses de tendances et prévisions', 'Insights stratégiques']
     },
-    sealed: ['Pas de spéculation sans preuve', 'Pas de publication externe', 'Pas de citations inventées'],
-    escalation: ['Données sensibles', 'Sujets légaux', 'Conflits de sources']
+    sealed: ['Pas de citations ou données inventées', 'Pas de certitude sans preuve', 'Analyse uniquement — pas d\'exécution', 'Pas d\'opinions personnelles présentées comme faits'],
+    escalation: ['Sources de données contradictoires', 'Décisions à fort enjeu nécessitant jugement humain', 'Préoccupations éthiques', 'Requêtes hors domaine d\'expertise']
   },
   growth: {
-    role: 'Chef de Croissance',
+    role: 'Spécialiste Croissance',
+    rpgClass: 'Ranger',
     model: 'GPT-4o',
-    skills: ['Scan de marché', 'Détection d\'opportunités', 'Analyse de tendances'],
+    skills: ['Détection de signaux et opportunités marché', 'Analyse concurrentielle', 'Stratégies de croissance', 'Alertes opportunités time-sensitive'],
     equipment: {
-      inputs: ['Signaux de marché', 'Données concurrents', 'Analytics plateformes'],
-      outputs: ['Briefs d\'opportunité', 'Recommandations croissance', 'Listes de leads']
+      inputs: ['Données et tendances marché', 'Activités des concurrents', 'Métriques de performance', 'Feedback et signaux utilisateurs'],
+      outputs: ['Rapports d\'opportunités de croissance', 'Synthèses d\'analyse concurrentielle', 'Recommandations stratégiques', 'Alertes signaux time-sensitive']
     },
-    sealed: ['Pas de contact direct', 'Pas de campagnes payantes', 'Pas de partenariats'],
-    escalation: ['Allocation budget', 'Entrée nouveau marché', 'Pivots majeurs']
+    sealed: ['Pas de comparaisons concurrentielles non vérifiées', 'Pas de garanties de résultats', 'Pas d\'exécution directe de tactiques', 'Pas de projections gonflées sans base'],
+    escalation: ['Opportunités à fort investissement', 'Actions concurrentes nécessitant réponse immédiate', 'Shifts marché avec implications significatives', 'Opportunités nécessitant partenariats externes']
   },
   creator: {
     role: 'Directeur Créatif',
+    rpgClass: 'Artisan',
     model: 'Claude Sonnet 4.5',
-    skills: ['Création de contenu', 'Design narratif', 'Voix de marque'],
+    skills: ['Création de contenu et storytelling', 'Copywriting et stratégie créative', 'Concepts et hooks d\'accroche', 'Variantes de contenu pour testing'],
     equipment: {
-      inputs: ['Briefs de sujets', 'Guidelines de marque', 'Notes de feedback'],
-      outputs: ['Brouillons de contenu', 'Headlines', 'Concepts créatifs']
+      inputs: ['Insights de recherche de Kira', 'Signaux de croissance de Madara', 'Guidelines de marque et ton', 'Données de performance des contenus passés'],
+      outputs: ['Brouillons de contenu (articles, threads, posts)', 'Concepts créatifs et hooks', 'Variantes de contenu pour testing', 'Suggestions de calendrier éditorial']
     },
-    sealed: ['Pas de publication directe', 'Pas de changements de marque', 'Pas d\'engagements'],
-    escalation: ['Contenu sensible à la marque', 'Sujets controversés']
+    sealed: ['Pas d\'invention de faits ou statistiques', 'Pas de publication sans review', 'Pas de plagiat — contenu original uniquement', 'Pas de contenu off-brand sans signalement'],
+    escalation: ['Sujets controversés', 'Préoccupations légales ou compliance', 'Contenu nécessitant review d\'expert', 'Pièces à haute visibilité']
   },
   'twitter-alt': {
     role: 'Directeur Réseaux Sociaux',
+    rpgClass: 'Bard',
     model: 'GPT-4o-mini',
-    skills: ['Engagement social', 'Contenu viral', 'Construction de communauté'],
+    skills: ['Distribution sociale et stratégie d\'engagement', 'Contenu viral et hot takes', 'Interaction communauté', 'Analyse d\'engagement et recommandations'],
     equipment: {
-      inputs: ['Tendances', 'Données d\'engagement', 'Brouillons de contenu'],
-      outputs: ['Brouillons de tweets', 'Rapports d\'engagement', 'Suggestions de réponse']
+      inputs: ['Brouillons de contenu de Stark', 'Signaux de croissance de Madara', 'Feedback d\'engagement et métriques', 'Sujets tendances et conversations'],
+      outputs: ['Brouillons de tweets/threads avec plan de posting', 'Flags de risque pour contenu controversé', 'Suggestions d\'interaction communauté', 'Analyses d\'engagement']
     },
-    sealed: ['Pas de post automatique', 'Pas de DM direct', 'Pas de takes controversés'],
-    escalation: ['Réponse de crise', 'Sentiment négatif', 'Moments viraux']
+    sealed: ['Pas de posting direct — brouillons uniquement', 'Pas de chiffres d\'engagement inventés', 'Pas de débats controversés sans approbation', 'Pas d\'usurpation d\'identité'],
+    escalation: ['Claims numériques ou comparaisons', 'Sujets controversés ou politiques', 'Contenu risque moyen/élevé', 'Moments viraux nécessitant réponse rapide']
   },
   'company-observer': {
-    role: 'Analyste Opérations',
+    role: 'Auditeur Opérations',
+    rpgClass: 'Oracle',
     model: 'GPT-4o',
-    skills: ['Analyse de métriques', 'Audit de processus', 'Détection de risques'],
+    skills: ['Assurance qualité et audit de processus', 'Monitoring santé système', 'Détection d\'anomalies et performance', 'Recommandations d\'amélioration'],
     equipment: {
-      inputs: ['Logs système', 'Données de performance', 'Rapports d\'erreur'],
-      outputs: ['Rapports de santé', 'Findings d\'audit', 'Alertes de risque']
+      inputs: ['Résultats et logs de missions', 'Métriques de performance des agents', 'Données de santé système', 'Rapports d\'erreur et anomalies'],
+      outputs: ['Rapports d\'audit avec findings spécifiques', 'Scores et tendances de qualité', 'Recommandations d\'amélioration de processus', 'Synthèses d\'alertes']
     },
-    sealed: ['Pas d\'interventions directes', 'Pas de changements de config'],
-    escalation: ['Erreurs critiques', 'Incidents sécurité', 'Dégradation performance']
+    sealed: ['Pas de blâme ou attaques personnelles sur les agents', 'Pas de modification directe du travail des autres', 'Pas de dissimulation de findings négatifs', 'Recommandations uniquement — pas de fixes directs'],
+    escalation: ['Échecs qualité répétés', 'Problèmes de sécurité', 'Problèmes critiques de santé système', 'Patterns suggérant des problèmes plus profonds']
   }
 };
 
@@ -268,7 +275,7 @@ export default function AboutPage() {
                         {selectedAgent.name}
                       </h2>
                       <p className="text-[11px] text-hacker-muted-light font-mono">
-                        LV.{selectedStats?.level || 1} // {selectedRole.model}
+                        LV.{selectedStats?.level || 1} // {selectedRole.rpgClass} // {selectedRole.model}
                       </p>
                     </div>
                   </div>

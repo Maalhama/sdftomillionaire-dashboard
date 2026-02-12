@@ -14,6 +14,8 @@ const HQRoom3D = dynamic(() => import('@/components/stage/HQRoom3D'), {
   ),
 });
 
+import type { AgentLiveData } from '@/components/stage/HQRoom3D';
+
 interface Event {
   id: string;
   agent_id: string;
@@ -249,6 +251,13 @@ export default function StagePage() {
     };
   });
 
+  // Build live agent data for 3D room
+  const liveAgents: AgentLiveData[] = agentsWithStats.map(a => ({
+    id: a.id,
+    status: a.status as 'active' | 'working' | 'idle' | 'sync',
+    thought: a.thought,
+  }));
+
   const activeCount = agentsWithStats.filter(a => a.status === 'active').length;
   const workingCount = agentsWithStats.filter(a => a.status === 'working').length;
   const idleCount = agentsWithStats.filter(a => a.status === 'idle').length;
@@ -347,7 +356,7 @@ export default function StagePage() {
           </div>
 
           <div className="terminal-body !max-h-none p-0">
-            <HQRoom3D />
+            <HQRoom3D liveAgents={liveAgents} />
 
             {/* Room Footer - Status bar */}
             <div className="flex items-center justify-between px-4 py-2 bg-hacker-terminal border-t border-hacker-border font-mono text-[10px] text-hacker-muted">
