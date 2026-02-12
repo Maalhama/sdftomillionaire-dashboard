@@ -356,9 +356,19 @@ const DEFAULT_CAM_POS: [number, number, number] = [5, 4, 8];
 const DEFAULT_CAM_FOV = 45;
 const DEFAULT_CAM_TARGET = new THREE.Vector3(0, 1, 0);
 
-// Camera reset helper — stores reset fn on window
+// Camera reset helper + mobile FOV adjustment
 function CameraResetter({ controlsRef }: { controlsRef: React.RefObject<any> }) {
   const { camera } = useThree();
+  const initialized = useRef(false);
+
+  // Widen FOV on mobile so the room + agent fits in the smaller viewport
+  if (!initialized.current && typeof window !== 'undefined') {
+    initialized.current = true;
+    if (window.innerWidth < 768 && (camera as THREE.PerspectiveCamera).fov) {
+      (camera as THREE.PerspectiveCamera).fov = 58;
+      (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
+    }
+  }
 
   const resetCamera = useCallback(() => {
     camera.position.set(...DEFAULT_CAM_POS);
