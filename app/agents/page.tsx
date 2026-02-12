@@ -204,30 +204,122 @@ export default function AgentsPage() {
             </div>
           </div>
 
-          {/* ═══ 3D CANVAS ═══ */}
-          <div className="relative h-[280px] sm:h-[380px] md:h-[460px] bg-[#060606]">
+          {/* ═══ MOBILE: Compact 3D + info below ═══ */}
+          <div className="block md:hidden">
+            {/* 3D Canvas — clean, no overlays */}
+            <div className="relative h-[260px] bg-[#060606]">
+              <div className="absolute inset-0">
+                <AgentShowcase3D
+                  key={`mobile-${selectedAgent}`}
+                  modelPath={agentModelPaths[selectedAgent]}
+                  agentColor={color}
+                  agentName={agent.name}
+                />
+              </div>
+              {/* Just agent name centered at bottom */}
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 pointer-events-none">
+                <span
+                  className="text-xs font-bold font-mono uppercase tracking-widest"
+                  style={{ color, textShadow: `0 0 12px ${color}66` }}
+                >
+                  {agent.name}
+                </span>
+              </div>
+            </div>
+
+            {/* Agent identity bar */}
+            <div className="px-4 py-2.5 flex items-center gap-3 border-t border-hacker-border bg-hacker-terminal">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-base border-2 shrink-0"
+                style={{ borderColor: color, boxShadow: `0 0 8px ${color}33` }}
+              >
+                {agent.emoji}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold font-mono" style={{ color }}>{agent.name}</span>
+                  <span className="text-[9px] text-hacker-muted-light font-mono">LV.{stats?.level || 1} {role.rpgClass}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-hacker-green animate-pulse shrink-0" />
+                  <span className="text-[9px] text-hacker-muted font-mono uppercase truncate">
+                    {role.role}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right shrink-0 font-mono">
+                <div className="text-[9px]">
+                  <span className="text-hacker-muted">OPS </span>
+                  <span style={{ color }}>{opsCount}</span>
+                </div>
+                <div className="text-[9px]">
+                  <span className="text-hacker-muted">SYNC </span>
+                  <span className="text-hacker-text">{lastEvent ? formatTimeAgo(lastEvent.created_at) : 'n/a'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Stats + Skills compact grid */}
+            <div className="px-4 py-2.5 grid grid-cols-2 gap-3 border-t border-hacker-border/50 bg-hacker-terminal">
+              <div className="font-mono">
+                <p className="text-[8px] text-hacker-cyan uppercase tracking-widest mb-1.5">Stats</p>
+                <div className="space-y-0.5 text-[10px]">
+                  {([
+                    { key: 'stat_wis', label: 'WIS' },
+                    { key: 'stat_tru', label: 'TRU' },
+                    { key: 'stat_spd', label: 'SPD' },
+                    { key: 'stat_cre', label: 'CRE' },
+                  ] as const).map((s) => {
+                    const val = stats?.[s.key] || 50;
+                    return (
+                      <div key={s.key} className="flex items-center gap-1">
+                        <span className="w-6 text-hacker-muted-light">{s.label}</span>
+                        <span className="text-hacker-green text-[9px]">{buildAsciiBar(val)}</span>
+                        <span className="text-hacker-text w-4 text-right">{val}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="font-mono">
+                <p className="text-[8px] text-hacker-cyan uppercase tracking-widest mb-1.5">Skills</p>
+                {role.skills.map((skill, i) => (
+                  <p key={i} className="text-[9px] text-hacker-text leading-snug mb-0.5">
+                    <span className="text-hacker-green">&gt;</span> {skill}
+                  </p>
+                ))}
+                <a href="/about" className="flex items-center gap-1 text-[8px] text-hacker-green uppercase tracking-widest mt-1.5">
+                  <span>Dossier</span>
+                  <ChevronRight className="w-2.5 h-2.5" />
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* ═══ DESKTOP: 3D Canvas with overlays ═══ */}
+          <div className="hidden md:block relative h-[460px] bg-[#060606]">
             <div className="absolute inset-0">
               <AgentShowcase3D
-                key={selectedAgent}
+                key={`desktop-${selectedAgent}`}
                 modelPath={agentModelPaths[selectedAgent]}
                 agentColor={color}
                 agentName={agent.name}
               />
             </div>
 
-            {/* ── TOP-RIGHT: Title (desktop) ── */}
-            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 text-right pointer-events-none">
-              <h1 className="text-sm sm:text-lg md:text-xl font-bold text-white/80 font-mono tracking-wider uppercase">
+            {/* Title */}
+            <div className="absolute top-4 right-4 text-right pointer-events-none">
+              <h1 className="text-xl font-bold text-white/80 font-mono tracking-wider uppercase">
                 SDF Agent HQ
               </h1>
-              <p className="text-[8px] sm:text-[9px] text-hacker-muted font-mono uppercase tracking-widest">
+              <p className="text-[9px] text-hacker-muted font-mono uppercase tracking-widest">
                 Unité: {agent.name}
               </p>
             </div>
 
-            {/* ── LEFT OVERLAY: Stats (desktop only) ── */}
+            {/* Left overlay: Stats */}
             <div
-              className="absolute top-4 left-4 w-[220px] pointer-events-none font-mono hidden md:block"
+              className="absolute top-4 left-4 w-[220px] pointer-events-none font-mono"
               style={{ background: 'rgba(6, 6, 6, 0.75)', borderRadius: '6px', border: '1px solid rgba(0, 255, 65, 0.12)', padding: '12px' }}
             >
               <div className="flex items-center gap-2.5 mb-2">
@@ -280,14 +372,12 @@ export default function AgentsPage() {
               </div>
             </div>
 
-            {/* ── RIGHT OVERLAY: Role Protocol (desktop only) ── */}
+            {/* Right overlay: Protocol */}
             <div
-              className="absolute top-14 right-4 w-[250px] pointer-events-none font-mono hidden md:block"
+              className="absolute top-14 right-4 w-[250px] pointer-events-none font-mono"
               style={{ background: 'rgba(6, 6, 6, 0.75)', borderRadius: '6px', border: '1px solid rgba(0, 255, 65, 0.12)', padding: '12px' }}
             >
-              <p className="text-[9px] text-hacker-muted uppercase tracking-widest mb-3">
-                Protocole de Rôle
-              </p>
+              <p className="text-[9px] text-hacker-muted uppercase tracking-widest mb-3">Protocole de Rôle</p>
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <p className="text-[8px] text-hacker-cyan uppercase tracking-widest mb-1.5">Skills</p>
@@ -306,100 +396,17 @@ export default function AgentsPage() {
                   ))}
                 </div>
               </div>
-              <a
-                href="/about"
-                className="flex items-center gap-1 text-[9px] text-hacker-green uppercase tracking-widest hover:text-white transition-colors pointer-events-auto"
-              >
+              <a href="/about" className="flex items-center gap-1 text-[9px] text-hacker-green uppercase tracking-widest hover:text-white transition-colors pointer-events-auto">
                 <span>Dossier Complet</span>
                 <ChevronRight className="w-3 h-3" />
               </a>
             </div>
 
-            {/* ── BOTTOM: Agent name label ── */}
+            {/* Agent name */}
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 pointer-events-none">
-              <span
-                className="text-xs sm:text-sm md:text-base font-bold font-mono uppercase tracking-widest"
-                style={{ color, textShadow: `0 0 12px ${color}66` }}
-              >
+              <span className="text-base font-bold font-mono uppercase tracking-widest" style={{ color, textShadow: `0 0 12px ${color}66` }}>
                 {agent.name}
               </span>
-            </div>
-          </div>
-
-          {/* ═══ MOBILE: Stats + Protocol (below canvas) ═══ */}
-          <div className="md:hidden border-t border-hacker-border bg-hacker-terminal">
-            {/* Agent identity bar */}
-            <div className="px-4 py-3 flex items-center gap-3 border-b border-hacker-border/50">
-              <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-lg border-2 shrink-0"
-                style={{ borderColor: color, boxShadow: `0 0 10px ${color}33` }}
-              >
-                {agent.emoji}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold font-mono" style={{ color }}>{agent.name}</span>
-                  <span className="text-[9px] text-hacker-muted-light font-mono">LV.{stats?.level || 1} {role.rpgClass}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-hacker-green animate-pulse shrink-0" />
-                  <span className="text-[9px] text-hacker-muted font-mono uppercase truncate">
-                    {role.role} — {stats?.current_affect || 'neutral'}
-                  </span>
-                </div>
-              </div>
-              <div className="text-right shrink-0 font-mono">
-                <div className="text-[9px]">
-                  <span className="text-hacker-muted">OPS </span>
-                  <span style={{ color }}>{opsCount}</span>
-                </div>
-                <div className="text-[9px]">
-                  <span className="text-hacker-muted">SYNC </span>
-                  <span className="text-hacker-text">{lastEvent ? formatTimeAgo(lastEvent.created_at) : 'n/a'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Stats bars + Protocol in 2 columns */}
-            <div className="px-4 py-3 grid grid-cols-2 gap-4">
-              {/* Stats column */}
-              <div className="font-mono">
-                <p className="text-[8px] text-hacker-cyan uppercase tracking-widest mb-2">Stats</p>
-                <div className="space-y-1 text-[10px]">
-                  {([
-                    { key: 'stat_wis', label: 'WIS' },
-                    { key: 'stat_tru', label: 'TRU' },
-                    { key: 'stat_spd', label: 'SPD' },
-                    { key: 'stat_cre', label: 'CRE' },
-                  ] as const).map((s) => {
-                    const val = stats?.[s.key] || 50;
-                    return (
-                      <div key={s.key} className="flex items-center gap-1">
-                        <span className="w-6 text-hacker-muted-light">{s.label}</span>
-                        <span className="text-hacker-green text-[9px]">{buildAsciiBar(val)}</span>
-                        <span className="text-hacker-text w-4 text-right">{val}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Skills column */}
-              <div className="font-mono">
-                <p className="text-[8px] text-hacker-cyan uppercase tracking-widest mb-2">Skills</p>
-                {role.skills.map((skill, i) => (
-                  <p key={i} className="text-[9px] text-hacker-text leading-snug mb-1">
-                    <span className="text-hacker-green">&gt;</span> {skill}
-                  </p>
-                ))}
-                <a
-                  href="/about"
-                  className="flex items-center gap-1 text-[8px] text-hacker-green uppercase tracking-widest mt-2"
-                >
-                  <span>Dossier Complet</span>
-                  <ChevronRight className="w-2.5 h-2.5" />
-                </a>
-              </div>
             </div>
           </div>
 
