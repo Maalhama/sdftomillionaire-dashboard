@@ -291,15 +291,15 @@ export default function HomePage() {
                 </p>
 
                 {/* Live badges */}
-                <div className="flex flex-wrap items-center gap-3 mb-1">
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-hacker-green/20 bg-hacker-green/5">
+                <div className="flex flex-wrap items-center gap-2.5 mb-1">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-hacker-green/20 bg-hacker-green/5">
                     <span className="status-dot status-active" />
-                    <span className="text-xs text-hacker-green font-mono">
+                    <span className="text-[11px] text-hacker-green font-mono">
                       {todayCount} idée{todayCount > 1 ? 's' : ''} aujourd&apos;hui
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-hacker-border bg-hacker-dark/50">
-                    <span className="text-xs text-hacker-muted-light font-mono">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-hacker-border bg-hacker-dark/50">
+                    <span className="text-[11px] text-hacker-muted-light font-mono">
                       résultats dans <span className="text-hacker-green">{countdown}</span>
                     </span>
                   </div>
