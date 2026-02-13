@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Terminal, Menu, X, LogOut, User } from 'lucide-react';
+import { Terminal, Menu, X, LogOut, User, Coins } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 
@@ -20,7 +20,26 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const { user, profile, loading, signOut } = useAuth();
+  const { user, profile, session, loading, signOut } = useAuth();
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
+
+  // Fetch credit balance
+  useEffect(() => {
+    if (!session?.access_token) { setCreditBalance(null); return; }
+
+    async function fetchCredits() {
+      try {
+        const res = await fetch('/api/credits', {
+          headers: { Authorization: `Bearer ${session!.access_token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setCreditBalance(data.balance);
+        }
+      } catch { /* silent */ }
+    }
+    fetchCredits();
+  }, [session?.access_token]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -99,6 +118,12 @@ export default function Navbar() {
                     <span className="text-xs text-hacker-muted-light font-mono hidden sm:inline">
                       {displayName}
                     </span>
+                    {creditBalance !== null && (
+                      <span className="hidden sm:flex items-center gap-1 text-[10px] text-hacker-amber font-mono">
+                        <Coins className="w-3 h-3" />
+                        {creditBalance}
+                      </span>
+                    )}
                   </button>
 
                   {/* Dropdown */}
@@ -107,6 +132,12 @@ export default function Navbar() {
                       <div className="px-3 py-2 border-b border-hacker-border">
                         <p className="text-xs text-white font-medium truncate">{displayName}</p>
                         <p className="text-[10px] text-hacker-muted font-mono truncate">{user.email}</p>
+                        {creditBalance !== null && (
+                          <p className="flex items-center gap-1 mt-1 text-[10px] text-hacker-amber font-mono">
+                            <Coins className="w-3 h-3" />
+                            {creditBalance} crédits
+                          </p>
+                        )}
                       </div>
                       <Link
                         href="/profile"

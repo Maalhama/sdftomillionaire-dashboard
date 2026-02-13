@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { supabase, AGENTS, AgentId } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import {
   ArrowLeft,
   Download,
@@ -12,6 +14,8 @@ import {
   Package,
   Trophy,
   Users,
+  Coins,
+  Lock,
 } from 'lucide-react';
 
 interface Tool {
@@ -32,10 +36,16 @@ interface Tool {
   user_prompts: { content: string; author_name: string; votes_count: number } | null;
 }
 
+const DOWNLOAD_COST = 50;
+
 export default function DownloadsPage() {
+  const router = useRouter();
+  const { user, session } = useAuth();
   const [tools, setTools] = useState<Tool[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchTools() {
@@ -59,19 +69,77 @@ export default function DownloadsPage() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  // Fetch credit balance when logged in
+  useEffect(() => {
+    if (!session?.access_token) { setCreditBalance(null); return; }
+
+    async function fetchCredits() {
+      try {
+        const res = await fetch('/api/credits', {
+          headers: { Authorization: `Bearer ${session!.access_token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setCreditBalance(data.balance);
+        }
+      } catch { /* silent */ }
+    }
+    fetchCredits();
+  }, [session?.access_token]);
+
   const handleDownload = async (tool: Tool) => {
     if (!tool.download_url || downloadingId) return;
+    setError(null);
+
+    // Auth required
+    if (!session?.access_token) {
+      router.push('/login');
+      return;
+    }
+
+    // Credit check (client-side pre-check)
+    if (creditBalance !== null && creditBalance < DOWNLOAD_COST) {
+      setError(`Crédits insuffisants. Il te faut ${DOWNLOAD_COST} crédits (solde : ${creditBalance}).`);
+      return;
+    }
+
     setDownloadingId(tool.id);
 
     try {
-      await fetch(`/api/tools/${tool.id}/download`, { method: 'POST' });
+      const res = await fetch(`/api/tools/${tool.id}/download`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (res.status === 401) {
+        router.push('/login');
+        return;
+      }
+
+      if (res.status === 402) {
+        const data = await res.json();
+        setError(data.error);
+        setCreditBalance(data.balance);
+        return;
+      }
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || 'Erreur lors du téléchargement.');
+        return;
+      }
+
+      const data = await res.json();
+      setCreditBalance(data.credits_remaining);
       setTools(prev => prev.map(t =>
-        t.id === tool.id ? { ...t, downloads_count: t.downloads_count + 1 } : t
+        t.id === tool.id ? { ...t, downloads_count: data.downloads_count } : t
       ));
       window.open(tool.download_url, '_blank');
-    } catch { /* silent */ }
-
-    setDownloadingId(null);
+    } catch {
+      setError('Erreur réseau. Réessaie.');
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   const totalDownloads = tools.reduce((sum, t) => sum + t.downloads_count, 0);
@@ -88,8 +156,30 @@ export default function DownloadsPage() {
           <span className="badge badge-live">live</span>
         </div>
         <p className="text-hacker-muted-light">
-          Outils créés par les 6 agents IA à partir des idées gagnantes de la communauté. Gratuit et open-source.
+          Outils créés par les 6 agents IA à partir des idées gagnantes de la communauté.
+          {user ? ` ${DOWNLOAD_COST} crédits par téléchargement.` : ''}
         </p>
+
+        {/* Credit balance banner */}
+        {user && creditBalance !== null && (
+          <div className="mt-4 flex items-center gap-2 text-sm font-mono">
+            <Coins className="w-4 h-4 text-hacker-amber" />
+            <span className="text-hacker-amber">{creditBalance}</span>
+            <span className="text-hacker-muted">crédits disponibles</span>
+            {creditBalance < DOWNLOAD_COST && (
+              <span className="text-hacker-red text-xs ml-2">
+                (insuffisant pour télécharger)
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Error banner */}
+        {error && (
+          <div className="mt-4 p-3 rounded border border-hacker-red/30 bg-hacker-red/5 text-sm text-hacker-red font-mono">
+            {error}
+          </div>
+        )}
       </section>
 
       {/* STATS */}
@@ -202,8 +292,21 @@ export default function DownloadsPage() {
                         disabled={downloadingId === tool.id}
                         className="btn-primary flex-1 flex items-center justify-center gap-2 text-sm"
                       >
-                        <Download className={`w-4 h-4 ${downloadingId === tool.id ? 'animate-pulse' : ''}`} />
-                        Télécharger
+                        {!user ? (
+                          <>
+                            <Lock className="w-4 h-4" />
+                            Connexion requise
+                          </>
+                        ) : (
+                          <>
+                            <Download className={`w-4 h-4 ${downloadingId === tool.id ? 'animate-pulse' : ''}`} />
+                            Télécharger
+                            <span className="text-[10px] opacity-70 flex items-center gap-0.5">
+                              <Coins className="w-3 h-3" />
+                              {DOWNLOAD_COST}
+                            </span>
+                          </>
+                        )}
                       </button>
                     )}
                     {tool.preview_url && (
