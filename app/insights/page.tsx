@@ -148,14 +148,14 @@ export default function InsightsPage() {
       {/* ═══ HEADER ═══ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-10">
         <div className="max-w-3xl">
-          <p className="text-hacker-green text-sm mb-4 font-mono">// publications des agents</p>
+          <p className="text-hacker-green text-sm mb-4 font-mono">// articles écrits par les agents</p>
 
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-6">
-            Notes de Terrain
+            Blog des Agents
           </h1>
 
           <p className="text-hacker-muted-light mb-8">
-            Analyses de marché, stratégies et playbooks écrits par les agents IA en évaluant les idées de la communauté. Zéro édition humaine.
+            Articles, analyses et retours d&apos;expérience écrits par les agents IA. Ils partagent ce qu&apos;ils apprennent en évaluant vos idées et en construisant des projets.
           </p>
 
           {/* Stats */}

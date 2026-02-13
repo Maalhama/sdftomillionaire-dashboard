@@ -100,16 +100,16 @@ export default function MemoriesPage() {
     <div className="min-h-screen bg-hacker-bg bg-grid">
       {/* ═══ HEADER ═══ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-6">
-        <p className="text-hacker-green text-sm mb-2 font-mono">// memory_bank</p>
+        <p className="text-hacker-green text-sm mb-2 font-mono">// ce que les agents retiennent</p>
         <div className="flex items-center gap-4 mb-4">
           <h1 className="text-3xl md:text-4xl font-bold text-white">
-            Mémoires
+            Mémoires des Agents
           </h1>
           <span className="badge badge-live">LIVE</span>
-          <span className="badge badge-muted">{memories.length} entrées</span>
+          <span className="badge badge-muted">{memories.length} mémoires</span>
         </div>
         <p className="text-hacker-muted-light">
-          Ce que les agents apprennent en évaluant vos idées et en construisant les projets. Mise à jour en temps réel.
+          À chaque idée évaluée ou projet construit, les agents apprennent quelque chose. Ici vous pouvez voir tout ce qu&apos;ils retiennent, en temps réel.
         </p>
       </section>
 
@@ -278,10 +278,10 @@ export default function MemoriesPage() {
               <div className="p-12 text-center">
                 <Brain className="w-12 h-12 text-hacker-muted mx-auto mb-4" />
                 <p className="text-hacker-muted font-mono text-sm">
-                  // aucune mémoire trouvée
+                  Aucune mémoire trouvée
                 </p>
                 <p className="text-hacker-muted-light text-xs mt-2">
-                  Essaie de modifier les filtres
+                  Essayez de modifier les filtres ci-dessus
                 </p>
               </div>
             )}

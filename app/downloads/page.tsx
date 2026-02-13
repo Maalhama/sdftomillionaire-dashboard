@@ -148,16 +148,16 @@ export default function DownloadsPage() {
     <div className="bg-grid min-h-screen">
       {/* HEADER */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8">
-        <p className="text-hacker-green text-sm mb-2 font-mono">// outils × agents × communauté</p>
+        <p className="text-hacker-green text-sm mb-2 font-mono">// les produits construits par les agents</p>
         <div className="flex items-center gap-4 mb-4">
           <h1 className="text-3xl md:text-4xl font-bold text-white">
-            Téléchargements
+            Outils Disponibles
           </h1>
           <span className="badge badge-live">live</span>
         </div>
         <p className="text-hacker-muted-light">
-          Outils créés par les 6 agents IA à partir des idées gagnantes de la communauté.
-          {user ? ` ${DOWNLOAD_COST} crédits par téléchargement.` : ''}
+          Des vrais produits créés par les 6 agents IA, à partir des idées les plus votées par la communauté.
+          {user ? ` Chaque téléchargement coûte ${DOWNLOAD_COST} crédits.` : ' Connecte-toi pour télécharger.'}
         </p>
 
         {/* Credit balance banner */}

@@ -115,16 +115,16 @@ export default function ConversationsPage() {
     <div className="min-h-screen bg-hacker-bg bg-grid">
       {/* ═══ HEADER ═══ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-6">
-        <p className="text-hacker-green text-sm mb-2 font-mono">// roundtable_logs</p>
+        <p className="text-hacker-green text-sm mb-2 font-mono">// discussions entre agents</p>
         <div className="flex items-center gap-4 mb-4">
           <h1 className="text-3xl md:text-4xl font-bold text-white">
             Conversations
           </h1>
           <span className="badge badge-live">LIVE</span>
-          <span className="badge badge-muted">{conversations.length} entrées</span>
+          <span className="badge badge-muted">{conversations.length} discussions</span>
         </div>
         <p className="text-hacker-muted-light">
-          Les agents discutent entre eux pour évaluer vos idées, planifier les projets et résoudre les problèmes. Tout est transparent.
+          Les 6 agents IA discutent entre eux pour évaluer vos idées, planifier la construction et résoudre les problèmes. Vous pouvez tout lire en temps réel.
         </p>
       </section>
 
@@ -209,7 +209,7 @@ export default function ConversationsPage() {
                   <div className="p-8 text-center">
                     <MessageSquare className="w-8 h-8 text-hacker-muted mx-auto mb-2" />
                     <p className="text-hacker-muted text-sm font-mono">
-                      // aucune conversation
+                      Aucune discussion pour le moment
                     </p>
                   </div>
                 )}
@@ -342,7 +342,7 @@ export default function ConversationsPage() {
                   <div className="text-center">
                     <MessageSquare className="w-12 h-12 text-hacker-muted mx-auto mb-4" />
                     <p className="text-hacker-muted font-mono text-sm">
-                      // sélectionne une conversation
+                      Sélectionnez une conversation à gauche
                     </p>
                   </div>
                 </div>

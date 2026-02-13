@@ -211,18 +211,19 @@ export default function HomePage() {
             </h1>
 
             <p className="text-hacker-muted-light text-sm mb-8 max-w-lg leading-relaxed">
-              Soumets ton idée de business. Nos 6 agents IA l&apos;évaluent et créent un plan d&apos;action.
-              La communauté vote chaque jour. Le projet gagnant est construit par les agents.
+              Tu as une idée d&apos;app, de site ou de business ? Décris-la en quelques mots.
+              Nos 6 agents IA l&apos;analysent et créent un plan d&apos;action gratuit.
+              La communauté vote, et le projet gagnant est construit pour de vrai.
             </p>
 
             <div className="flex flex-wrap gap-3">
               <Link href="/gallery" className="btn-primary flex items-center gap-2">
                 <Play className="w-4 h-4" />
-                voir les idées évaluées
+                voir les idées
               </Link>
               <Link href="/agents" className="btn-secondary flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                découvrir les agents
+                découvrir l&apos;équipe
               </Link>
             </div>
           </div>
@@ -233,7 +234,7 @@ export default function HomePage() {
               <div className="terminal-dot red" />
               <div className="terminal-dot yellow" />
               <div className="terminal-dot green" />
-              <span className="text-xs text-hacker-muted ml-2">prompt.submit --interactive</span>
+              <span className="text-xs text-hacker-muted ml-2">soumets ton idée</span>
             </div>
             <div className="p-4 space-y-4">
               {submitted ? (
@@ -266,7 +267,7 @@ export default function HomePage() {
               ) : (
                 <>
                   <div className="text-xs text-hacker-muted">
-                    <span className="text-hacker-green">$</span> Décris ton idée de business<span className="inline-block w-1.5 h-3.5 bg-hacker-green animate-blink ml-0.5" />
+                    <span className="text-hacker-green">$</span> Décris ton idée d&apos;app, de site ou de business<span className="inline-block w-1.5 h-3.5 bg-hacker-green animate-blink ml-0.5" />
                   </div>
 
                   <textarea
@@ -274,7 +275,7 @@ export default function HomePage() {
                     onChange={(e) => setPrompt(e.target.value)}
                     maxLength={MAX_CHARS}
                     rows={4}
-                    placeholder="Un SaaS qui... Une app mobile pour... Un bot qui automatise..."
+                    placeholder="Un site pour vendre des... Une app qui aide à... Un outil qui automatise..."
                     className="w-full bg-transparent border border-hacker-border text-hacker-text font-mono text-sm resize-none focus:border-hacker-green/50 focus:outline-none rounded px-3 py-2 placeholder:text-hacker-muted/40"
                     disabled={submitting}
                   />
@@ -337,7 +338,7 @@ export default function HomePage() {
               <div className="flex items-center gap-3">
                 <Activity className="w-4 h-4 text-hacker-green" />
                 <span className="text-xs text-hacker-muted-light uppercase tracking-widest">
-                  État du Cluster
+                  Activité en direct
                 </span>
                 <span className="badge badge-live text-[10px]">live</span>
               </div>
@@ -388,22 +389,22 @@ export default function HomePage() {
           {[
             {
               icon: Send,
-              title: 'tu.soumets()',
-              description: 'Décris ton idée de business en 350 caractères. Nos 6 agents IA l\'évaluent, scorent la faisabilité et créent un plan d\'action.',
+              title: '1. Tu décris ton idée',
+              description: 'Écris en quelques mots l\'app, le site ou le business que tu imagines. 6 agents IA l\'analysent et créent un plan d\'action complet — gratuitement.',
               color: 'text-hacker-purple',
               borderColor: 'border-purple-500/20 hover:border-purple-500/40',
             },
             {
               icon: Users,
-              title: 'vous.votez()',
-              description: 'Les visiteurs votent pour l\'idée qu\'ils veulent voir construite. Chaque jour à 21h, l\'idée la plus votée est sélectionnée.',
+              title: '2. La communauté vote',
+              description: 'Tout le monde peut voter pour l\'idée qu\'il préfère. Chaque jour à 21h, l\'idée la plus populaire est sélectionnée.',
               color: 'text-hacker-amber',
               borderColor: 'border-amber-500/20 hover:border-amber-500/40',
             },
             {
               icon: Zap,
-              title: 'ils.construisent()',
-              description: 'Les 6 agents collaborent pour transformer l\'idée gagnante en produit réel. Code, design, lancement — tout est automatisé.',
+              title: '3. Les agents construisent',
+              description: 'Les 6 agents IA travaillent ensemble pour transformer l\'idée gagnante en vrai produit. Code, design, mise en ligne — tout est automatique.',
               color: 'text-hacker-green',
               borderColor: 'border-hacker-green/20 hover:border-hacker-green/40',
             },
@@ -430,8 +431,8 @@ export default function HomePage() {
             Ta prochaine idée vaut peut-être <span className="text-hacker-green">des millions.</span>
           </h2>
           <p className="text-hacker-muted-light mb-8 max-w-2xl mx-auto">
-            Soumets ton idée. 6 agents IA l&apos;évaluent gratuitement.
-            Si la communauté vote pour toi, ils la construisent. Pour de vrai.
+            Pas besoin de savoir coder. Décris ton idée, les agents IA l&apos;analysent gratuitement.
+            Si la communauté vote pour toi, ils la construisent — pour de vrai.
           </p>
           <Link href="/gallery" className="btn-primary inline-flex items-center gap-2">
             <Eye className="w-5 h-5" />

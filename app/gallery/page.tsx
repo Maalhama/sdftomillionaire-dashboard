@@ -207,7 +207,7 @@ export default function GalleryPage() {
     <div className="bg-grid min-h-screen">
       {/* HEADER */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8">
-        <p className="text-hacker-green text-sm mb-2 font-mono">// idées × votes × plans IA</p>
+        <p className="text-hacker-green text-sm mb-2 font-mono">// toutes les idées soumises</p>
         <div className="flex items-center gap-4 mb-4">
           <h1 className="text-3xl md:text-4xl font-bold text-white">
             Galerie des Idées
@@ -215,7 +215,8 @@ export default function GalleryPage() {
           <span className="badge badge-live">live</span>
         </div>
         <p className="text-hacker-muted-light">
-          Chaque idée est évaluée par 6 agents IA. Votez pour celle que vous voulez voir construite — le gagnant du jour sera réalisé par les agents.
+          Parcourez les idées d&apos;apps, de sites et de business soumises par la communauté.
+          Votez pour votre préférée — l&apos;idée la plus populaire sera construite par les agents.
         </p>
       </section>
 

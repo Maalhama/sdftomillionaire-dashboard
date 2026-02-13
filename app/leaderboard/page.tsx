@@ -88,15 +88,15 @@ export default function LeaderboardPage() {
     <div className="bg-grid min-h-screen">
       {/* HEADER */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8">
-        <p className="text-hacker-green text-sm mb-2 font-mono">// classement × contributeurs × impact</p>
+        <p className="text-hacker-green text-sm mb-2 font-mono">// les plus actifs de la communauté</p>
         <div className="flex items-center gap-4 mb-4">
           <h1 className="text-3xl md:text-4xl font-bold text-white">
-            Classement
+            Top Contributeurs
           </h1>
           <Hash className="w-8 h-8 text-hacker-amber" />
         </div>
         <p className="text-hacker-muted-light">
-          Top 50 des contributeurs de la communauté SDFtoMillionaire.
+          Les 50 membres les plus actifs. Soumets des idées et vote pour monter dans le classement.
         </p>
       </section>
 

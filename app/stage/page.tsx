@@ -307,7 +307,7 @@ export default function StagePage() {
           <div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-4">
               <h1 className="font-mono text-2xl sm:text-3xl font-bold text-hacker-green text-glow">
-                // The Stage
+                QG des Agents
               </h1>
               <span className="badge badge-live text-xs">LIVE</span>
             </div>
@@ -367,7 +367,7 @@ export default function StagePage() {
       {/* ══ HQ ROOM VIEW — 3D ══ */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
         <div className="flex items-center gap-2 mb-3">
-          <span className="font-mono text-sm text-hacker-green">// hq_room_view</span>
+          <span className="font-mono text-sm text-hacker-green">// salle 3D en direct</span>
           <span className="badge badge-live text-[10px]">3D LIVE</span>
         </div>
 
@@ -393,7 +393,7 @@ export default function StagePage() {
                 <span className="mx-2 text-hacker-border">|</span>
                 <span className="text-hacker-muted-light">●</span> {idleCount} inactifs
               </span>
-              <span className="text-hacker-green/50">glisser pour tourner // scroll pour zoomer // survoler les agents</span>
+              <span className="text-hacker-green/50">glisser pour tourner · scroll pour zoomer · survoler les agents</span>
             </div>
           </div>
         </div>
@@ -402,7 +402,7 @@ export default function StagePage() {
       {/* Agent Monitoring Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-5">
         <div className="flex items-center gap-2 mb-3">
-          <span className="font-mono text-sm text-hacker-green">// agent_monitoring</span>
+          <span className="font-mono text-sm text-hacker-green">// statut des agents</span>
           <span className="font-mono text-xs text-hacker-muted">
             {activeCount + workingCount}/{agentsWithStats.length} actifs
           </span>
@@ -469,7 +469,7 @@ export default function StagePage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-5">
         <div className="card-terminal p-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="font-mono text-sm text-hacker-green">// mission_progress</span>
+            <span className="font-mono text-sm text-hacker-green">// progression des missions</span>
           </div>
           <div className="font-mono text-sm overflow-x-auto">
             <span className="text-hacker-amber">MISSIONS {missionCount.completed}/{missionCount.total}</span>
@@ -492,7 +492,7 @@ export default function StagePage() {
       {activeRoundtable && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-5">
           <div className="flex items-center gap-2 mb-3">
-            <span className="font-mono text-sm text-hacker-green">// live_conversation</span>
+            <span className="font-mono text-sm text-hacker-green">// discussion en cours</span>
             <span className={`badge ${activeRoundtable.status === 'running' ? 'badge-live' : 'badge-muted'} text-[10px]`}>
               {activeRoundtable.status === 'running' ? '🔴 LIVE' : activeRoundtable.status.toUpperCase()}
             </span>
@@ -578,7 +578,7 @@ export default function StagePage() {
       {/* Live Event Feed */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
         <div className="flex items-center gap-2 mb-3">
-          <span className="font-mono text-sm text-hacker-green">// live_event_feed</span>
+          <span className="font-mono text-sm text-hacker-green">// activité en direct</span>
           <span className="font-mono text-xs text-hacker-muted">{events.length} entrées</span>
         </div>
 
@@ -595,8 +595,8 @@ export default function StagePage() {
               {events.length === 0 ? (
                 <div className="text-center py-12">
                   <Activity className="w-12 h-12 text-hacker-muted mx-auto mb-4" />
-                  <p className="text-hacker-muted font-mono text-sm">// aucun événement récent</p>
-                  <p className="text-hacker-muted-light text-xs mt-2">Les agents sont au repos</p>
+                  <p className="text-hacker-muted font-mono text-sm">Aucune activité récente</p>
+                  <p className="text-hacker-muted-light text-xs mt-2">Les agents sont au repos pour le moment</p>
                 </div>
               ) : (
                 events.map((event) => {

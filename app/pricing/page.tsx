@@ -124,16 +124,16 @@ function PricingContent() {
     <div className="bg-grid min-h-screen">
       {/* HEADER */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8">
-        <p className="text-hacker-green text-sm mb-2 font-mono">// crédits × packs × outils</p>
+        <p className="text-hacker-green text-sm mb-2 font-mono">// recharge tes crédits</p>
         <div className="flex items-center gap-4 mb-4">
           <h1 className="text-3xl md:text-4xl font-bold text-white">
-            Crédits
+            Boutique
           </h1>
           <Database className="w-8 h-8 text-hacker-amber" />
         </div>
         <p className="text-hacker-muted-light max-w-2xl">
-          Les crédits te permettent de télécharger les outils créés par les agents IA.
-          100 crédits offerts à l&apos;inscription, puis choisis le pack qui te convient.
+          Les crédits servent à télécharger les produits créés par les agents.
+          Tu reçois 100 crédits gratuits à l&apos;inscription. Besoin de plus ? Choisis ton pack.
         </p>
 
         {user && creditBalance !== null && (

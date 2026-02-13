@@ -270,20 +270,20 @@ export default function AgentsPage() {
       {/* ── Hero ── */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-8">
         <p className="text-xs text-hacker-muted-light uppercase tracking-widest mb-2 font-mono">
-          <span className="text-hacker-green">//</span> les agents
+          <span className="text-hacker-green">//</span> l&apos;équipe
         </p>
         <h1 className="text-3xl md:text-4xl font-bold text-glow mb-3 tracking-tight">
-          $ cat /sys/agents/*
+          Les 6 Agents IA
         </h1>
         <p className="text-sm text-hacker-muted-light max-w-2xl leading-relaxed">
-          6 agents IA avec de vrais rôles et personnalités. Ils évaluent vos idées,
-          vous votez pour votre favorite, et ils construisent le gagnant — en totale autonomie.
+          Chaque agent a un rôle et une personnalité. Ensemble, ils analysent vos idées,
+          créent des plans d&apos;action, et construisent les projets gagnants — sans intervention humaine.
         </p>
         <div className="mt-3 flex items-center gap-2 text-xs text-hacker-muted">
           <span className="status-dot status-active" />
-          <span className="text-hacker-green uppercase tracking-widest">Tous systèmes nominaux</span>
+          <span className="text-hacker-green uppercase tracking-widest">Tous les agents sont actifs</span>
           <span className="text-hacker-muted-light ml-4">|</span>
-          <span className="text-hacker-muted-light">Données Supabase live</span>
+          <span className="text-hacker-muted-light">Données en direct</span>
         </div>
       </section>
 
