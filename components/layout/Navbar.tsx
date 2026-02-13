@@ -19,9 +19,10 @@ const navLinks = [
 
 export default function Navbar() {
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { user, profile, session, loading, signOut } = useAuth();
   const [creditBalance, setCreditBalance] = useState<number | null>(null);
 
@@ -54,11 +55,29 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  // Close menu on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    if (menuOpen) {
+      document.addEventListener('mousedown', handleClick);
+      return () => document.removeEventListener('mousedown', handleClick);
+    }
+  }, [menuOpen]);
+
+  // Close menu on route change
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
   const displayName = profile?.display_name || profile?.username || user?.email?.split('@')[0] || 'User';
   const avatarUrl = profile?.avatar_url;
 
   return (
-    <header className="sticky top-0 z-50 bg-hacker-bg/95 backdrop-blur-sm border-b border-hacker-border">
+    <header className="sticky top-0 z-50 bg-hacker-bg/95 backdrop-blur-sm border-b border-hacker-border" ref={menuRef}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
@@ -72,28 +91,7 @@ export default function Navbar() {
             <span className="badge badge-live text-[10px] hidden sm:inline-flex">live</span>
           </Link>
 
-          {/* Navigation Desktop */}
-          <nav className="hidden md:flex items-center gap-1">
-            {navLinks.map((link) => {
-              const isActive = pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href.split('#')[0]));
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`px-3 py-1.5 text-xs uppercase tracking-widest transition-all rounded ${
-                    isActive
-                      ? 'text-hacker-green bg-hacker-green/10'
-                      : 'text-hacker-muted-light hover:text-hacker-green'
-                  }`}
-                >
-                  {isActive && <span className="mr-1 text-hacker-green/50">&gt;</span>}
-                  {link.label}
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Auth + Status + Mobile Menu */}
+          {/* Right side: status + auth + hamburger */}
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-2 text-[11px] text-hacker-muted">
               <span className="status-dot status-active" />
@@ -169,25 +167,26 @@ export default function Navbar() {
               )
             )}
 
+            {/* Hamburger — always visible */}
             <button
-              className="md:hidden text-hacker-muted-light hover:text-hacker-green transition-colors"
-              onClick={() => setMobileOpen(!mobileOpen)}
+              className="text-hacker-muted-light hover:text-hacker-green transition-colors"
+              onClick={() => setMenuOpen(!menuOpen)}
             >
-              {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
 
-        {/* Mobile Navigation */}
-        {mobileOpen && (
-          <nav className="md:hidden border-t border-hacker-border py-3 space-y-1">
+        {/* Navigation panel (all screen sizes) */}
+        {menuOpen && (
+          <nav className="border-t border-hacker-border py-3 space-y-1">
             {navLinks.map((link) => {
-              const isActive = pathname === link.href;
+              const isActive = pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href));
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  onClick={() => setMobileOpen(false)}
+                  onClick={() => setMenuOpen(false)}
                   className={`block px-3 py-2 text-xs uppercase tracking-widest rounded ${
                     isActive
                       ? 'text-hacker-green bg-hacker-green/10'
@@ -202,7 +201,7 @@ export default function Navbar() {
             {!loading && !user && (
               <Link
                 href="/login"
-                onClick={() => setMobileOpen(false)}
+                onClick={() => setMenuOpen(false)}
                 className="block px-3 py-2 text-xs uppercase tracking-widest text-hacker-green"
               >
                 <span className="mr-2 text-hacker-muted">$</span>
@@ -213,14 +212,14 @@ export default function Navbar() {
               <>
                 <Link
                   href="/profile"
-                  onClick={() => setMobileOpen(false)}
+                  onClick={() => setMenuOpen(false)}
                   className="block px-3 py-2 text-xs uppercase tracking-widest text-hacker-muted-light hover:text-hacker-green"
                 >
                   <span className="mr-2 text-hacker-muted">$</span>
                   cd /profil
                 </Link>
                 <button
-                  onClick={() => { signOut(); setMobileOpen(false); }}
+                  onClick={() => { signOut(); setMenuOpen(false); }}
                   className="block w-full text-left px-3 py-2 text-xs uppercase tracking-widest text-hacker-red hover:bg-hacker-red/5 rounded"
                 >
                   <span className="mr-2 text-hacker-muted">$</span>
