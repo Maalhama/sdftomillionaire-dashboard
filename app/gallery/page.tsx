@@ -180,8 +180,18 @@ export default function GalleryPage() {
     // Realtime updates
     const channel = supabase
       .channel('prompts-gallery')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_prompts' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'user_prompts' }, () => {
         fetchPrompts();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_prompts' }, (payload) => {
+        const updated = payload.new as UserPrompt;
+        setPrompts(prev => prev.map(p =>
+          p.id === updated.id ? { ...p, ...updated } : p
+        ));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'user_prompts' }, (payload) => {
+        const deletedId = (payload.old as { id: string }).id;
+        setPrompts(prev => prev.filter(p => p.id !== deletedId));
       })
       .subscribe();
 
