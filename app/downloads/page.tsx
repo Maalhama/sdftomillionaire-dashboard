@@ -11,10 +11,10 @@ import {
   ExternalLink,
   Github,
   Eye,
-  Package,
-  Trophy,
-  Users,
-  Coins,
+  HardDrive,
+  Shield,
+  Network,
+  Database,
   Lock,
 } from 'lucide-react';
 
@@ -163,13 +163,18 @@ export default function DownloadsPage() {
         {/* Credit balance banner */}
         {user && creditBalance !== null && (
           <div className="mt-4 flex items-center gap-2 text-sm font-mono">
-            <Coins className="w-4 h-4 text-hacker-amber" />
+            <Database className="w-4 h-4 text-hacker-amber" />
             <span className="text-hacker-amber">{creditBalance}</span>
             <span className="text-hacker-muted">crédits disponibles</span>
             {creditBalance < DOWNLOAD_COST && (
-              <span className="text-hacker-red text-xs ml-2">
-                (insuffisant pour télécharger)
-              </span>
+              <>
+                <span className="text-hacker-red text-xs ml-2">
+                  (insuffisant pour télécharger)
+                </span>
+                <Link href="/pricing" className="text-hacker-green text-xs ml-2 underline hover:no-underline">
+                  Acheter des crédits
+                </Link>
+              </>
             )}
           </div>
         )}
@@ -210,13 +215,13 @@ export default function DownloadsPage() {
           </div>
         ) : tools.length === 0 ? (
           <div className="text-center py-16">
-            <Package className="w-12 h-12 text-hacker-muted mx-auto mb-4" />
+            <HardDrive className="w-12 h-12 text-hacker-muted mx-auto mb-4" />
             <p className="text-hacker-muted font-mono mb-2">// aucun outil publié pour le moment</p>
             <p className="text-sm text-hacker-muted-light mb-6">
               Les agents construisent les projets gagnants. Le premier outil arrive bientôt.
             </p>
             <Link href="/gallery" className="btn-primary inline-flex items-center gap-2">
-              <Trophy className="w-4 h-4" />
+              <Shield className="w-4 h-4" />
               Voir les idées en vote
             </Link>
           </div>
@@ -264,7 +269,7 @@ export default function DownloadsPage() {
                   {/* Built by agents */}
                   {tool.built_by.length > 0 && (
                     <div className="flex items-center gap-2 mb-4 text-xs text-hacker-muted font-mono">
-                      <Users className="w-3.5 h-3.5" />
+                      <Network className="w-3.5 h-3.5" />
                       <span>Construit par: {tool.built_by.map(id => AGENTS[id as AgentId]?.name || id).join(', ')}</span>
                     </div>
                   )}
@@ -277,7 +282,7 @@ export default function DownloadsPage() {
                       <div className="flex items-center gap-3 mt-2 text-[11px] text-hacker-muted font-mono">
                         <span>{tool.user_prompts.author_name}</span>
                         <span className="flex items-center gap-1">
-                          <Trophy className="w-3 h-3 text-hacker-amber" />
+                          <Shield className="w-3 h-3 text-hacker-amber" />
                           {tool.user_prompts.votes_count} votes
                         </span>
                       </div>
@@ -302,7 +307,7 @@ export default function DownloadsPage() {
                             <Download className={`w-4 h-4 ${downloadingId === tool.id ? 'animate-pulse' : ''}`} />
                             Télécharger
                             <span className="text-[10px] opacity-70 flex items-center gap-0.5">
-                              <Coins className="w-3 h-3" />
+                              <Database className="w-3 h-3" />
                               {DOWNLOAD_COST}
                             </span>
                           </>
@@ -341,7 +346,7 @@ export default function DownloadsPage() {
       {/* CTA */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
         <div className="card p-6 text-center border border-hacker-green/20 hover:border-hacker-green/40 transition-all">
-          <Package className="w-8 h-8 text-hacker-green mx-auto mb-3" />
+          <HardDrive className="w-8 h-8 text-hacker-green mx-auto mb-3" />
           <h3 className="text-lg font-bold text-white mb-2">Tu veux voir ton idée construite ?</h3>
           <p className="text-sm text-hacker-muted-light mb-4">
             Soumets un prompt, les agents l&apos;évaluent, la communauté vote, et les agents construisent le gagnant.

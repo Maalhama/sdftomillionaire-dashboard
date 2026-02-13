@@ -195,6 +195,9 @@ export default function AgentsPage() {
   useEffect(() => {
     fetchData();
 
+    // Safety timeout: force loading off after 8s
+    const timeout = setTimeout(() => setLoading(false), 8000);
+
     const channel = supabase
       .channel('agents-hq-updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_agent_stats' }, () => {
@@ -205,19 +208,24 @@ export default function AgentsPage() {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { clearTimeout(timeout); supabase.removeChannel(channel); };
   }, []);
 
   async function fetchData() {
-    const [{ data: stats }, { data: events }, { data: rels }] = await Promise.all([
-      supabase.from('ops_agent_stats').select('*'),
-      supabase.from('ops_agent_events').select('*').order('created_at', { ascending: false }).limit(50),
-      supabase.from('ops_agent_relationships').select('*'),
-    ]);
-    setAllStats(stats || []);
-    setRecentEvents(events || []);
-    setRelationships(rels || []);
-    setLoading(false);
+    try {
+      const [{ data: stats }, { data: events }, { data: rels }] = await Promise.all([
+        supabase.from('ops_agent_stats').select('*'),
+        supabase.from('ops_agent_events').select('*').order('created_at', { ascending: false }).limit(50),
+        supabase.from('ops_agent_relationships').select('*'),
+      ]);
+      setAllStats(stats || []);
+      setRecentEvents(events || []);
+      setRelationships(rels || []);
+    } catch (err) {
+      console.error('Agents fetchData error:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const agent = AGENTS[selectedAgent];

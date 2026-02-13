@@ -43,29 +43,35 @@ export default function ConversationsPage() {
 
   useEffect(() => {
     fetchConversations();
-    
+    const timeout = setTimeout(() => setLoading(false), 8000);
+
     const channel = supabase
       .channel('conversations')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ops_roundtable_queue' }, () => {
         fetchConversations();
       })
       .subscribe();
-    
-    return () => { supabase.removeChannel(channel); };
+
+    return () => { clearTimeout(timeout); supabase.removeChannel(channel); };
   }, []);
 
   async function fetchConversations() {
-    const { data } = await supabase
-      .from('ops_roundtable_queue')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50);
-    
-    setConversations(data || []);
-    if (data && data.length > 0 && !selected) {
-      setSelected(data[0]);
+    try {
+      const { data } = await supabase
+        .from('ops_roundtable_queue')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      setConversations(data || []);
+      if (data && data.length > 0 && !selected) {
+        setSelected(data[0]);
+      }
+    } catch (err) {
+      console.error('Conversations fetchConversations error:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   const getAgentInfo = (name: string) => {

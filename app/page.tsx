@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState, useCallback } from 'react';
-import { Play, Users, ArrowRight, Activity, Cpu, Eye, Zap, Terminal, ChevronRight, Send } from 'lucide-react';
+import { Play, Users, ArrowRight, Activity, Cpu, Eye, Zap, Terminal, ChevronRight, Send, LogOut } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 
 const agentMetadata: Record<string, { name: string; role: string; emoji: string; avatar: string; color: string }> = {
   'opus': { name: 'CEO', role: 'Chef des Opérations', emoji: '🎩', avatar: '/agents/opus.png', color: '#f59e0b' },
@@ -18,9 +19,11 @@ const agentMetadata: Record<string, { name: string; role: string; emoji: string;
 const MAX_CHARS = 350;
 
 export default function HomePage() {
+  const { user, profile } = useAuth();
   const [agents, setAgents] = useState<any[]>([]);
   const [signalsToday, setSignalsToday] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const [loggedOutBanner, setLoggedOutBanner] = useState(false);
 
   // Prompt submission state
   const [prompt, setPrompt] = useState('');
@@ -30,6 +33,25 @@ export default function HomePage() {
   const [todayCount, setTodayCount] = useState(0);
   const [submitError, setSubmitError] = useState('');
   const [countdown, setCountdown] = useState('');
+
+  // Show logged out banner
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('logged_out=1')) {
+      setLoggedOutBanner(true);
+      window.history.replaceState({}, '', '/');
+      const timer = setTimeout(() => setLoggedOutBanner(false), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // Auto-fill author name from profile
+  useEffect(() => {
+    if (profile?.display_name && !authorName) {
+      setAuthorName(profile.display_name);
+    } else if (profile?.username && !authorName) {
+      setAuthorName(profile.username);
+    }
+  }, [profile]);
 
   // Fetch real agent data from Supabase
   useEffect(() => {
@@ -161,6 +183,16 @@ export default function HomePage() {
 
   return (
     <div className="bg-grid">
+      {/* ═══ LOGGED OUT BANNER ═══ */}
+      {loggedOutBanner && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded border border-hacker-green/30 bg-hacker-dark/95 backdrop-blur-sm shadow-lg font-mono text-sm">
+            <LogOut className="w-4 h-4 text-hacker-green" />
+            <span className="text-hacker-green">Déconnecté avec succès</span>
+          </div>
+        </div>
+      )}
+
       {/* ═══ HERO ═══ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
         <div className="grid lg:grid-cols-2 gap-12 items-center">

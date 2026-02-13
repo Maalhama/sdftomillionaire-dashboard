@@ -2,13 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Terminal, Menu, X, LogOut, User, Coins } from 'lucide-react';
+import { Terminal, Menu, X, LogOut, User, Database } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 
 const navLinks = [
   { href: '/gallery', label: 'idées' },
   { href: '/downloads', label: 'outils' },
+  { href: '/pricing', label: 'crédits' },
+  { href: '/leaderboard', label: 'classement' },
   { href: '/radar', label: 'radar' },
   { href: '/agents', label: 'agents' },
   { href: '/stage', label: 'stage' },
@@ -120,7 +122,7 @@ export default function Navbar() {
                     </span>
                     {creditBalance !== null && (
                       <span className="hidden sm:flex items-center gap-1 text-[10px] text-hacker-amber font-mono">
-                        <Coins className="w-3 h-3" />
+                        <Database className="w-3 h-3" />
                         {creditBalance}
                       </span>
                     )}
@@ -134,7 +136,7 @@ export default function Navbar() {
                         <p className="text-[10px] text-hacker-muted font-mono truncate">{user.email}</p>
                         {creditBalance !== null && (
                           <p className="flex items-center gap-1 mt-1 text-[10px] text-hacker-amber font-mono">
-                            <Coins className="w-3 h-3" />
+                            <Database className="w-3 h-3" />
                             {creditBalance} crédits
                           </p>
                         )}
@@ -206,6 +208,25 @@ export default function Navbar() {
                 <span className="mr-2 text-hacker-muted">$</span>
                 auth --login
               </Link>
+            )}
+            {!loading && user && (
+              <>
+                <Link
+                  href="/profile"
+                  onClick={() => setMobileOpen(false)}
+                  className="block px-3 py-2 text-xs uppercase tracking-widest text-hacker-muted-light hover:text-hacker-green"
+                >
+                  <span className="mr-2 text-hacker-muted">$</span>
+                  cd /profil
+                </Link>
+                <button
+                  onClick={() => { signOut(); setMobileOpen(false); }}
+                  className="block w-full text-left px-3 py-2 text-xs uppercase tracking-widest text-hacker-red hover:bg-hacker-red/5 rounded"
+                >
+                  <span className="mr-2 text-hacker-muted">$</span>
+                  auth --logout
+                </button>
+              </>
             )}
           </nav>
         )}

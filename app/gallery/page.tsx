@@ -6,22 +6,24 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import {
   ArrowLeft,
-  Lightbulb,
+  Braces,
   Clock,
-  ThumbsUp,
-  ChevronDown,
   ChevronUp,
+  ChevronDown,
+  ChevronRight,
   AlertTriangle,
   CheckCircle,
   XCircle,
   Zap,
-  Target,
-  DollarSign,
+  Crosshair,
+  CircuitBoard,
   Timer,
   Users,
-  Trophy,
-  Hammer,
+  Shield,
+  Wrench,
+  MessageSquare,
 } from 'lucide-react';
+import PromptComments from '@/components/PromptComments';
 
 interface AiPlan {
   feasibility_score: number;
@@ -42,6 +44,7 @@ interface UserPrompt {
   author_name: string;
   status: string;
   votes_count: number;
+  comments_count: number;
   ai_plan: AiPlan | null;
   created_at: string;
   evaluated_at: string | null;
@@ -153,15 +156,23 @@ export default function GalleryPage() {
 
   useEffect(() => {
     async function fetchPrompts() {
-      const { data } = await supabase
-        .from('user_prompts')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (data) setPrompts(data);
-      setLoading(false);
+      try {
+        const { data } = await supabase
+          .from('user_prompts')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50);
+        if (data) setPrompts(data);
+      } catch (err) {
+        console.error('Gallery fetchPrompts error:', err);
+      } finally {
+        setLoading(false);
+      }
     }
     fetchPrompts();
+
+    // Safety timeout
+    const timeout = setTimeout(() => setLoading(false), 8000);
 
     // Realtime updates
     const channel = supabase
@@ -171,7 +182,7 @@ export default function GalleryPage() {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { clearTimeout(timeout); supabase.removeChannel(channel); };
   }, []);
 
   const filtered = prompts.filter(p => {
@@ -260,7 +271,7 @@ export default function GalleryPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-12">
-            <Lightbulb className="w-8 h-8 text-hacker-muted mx-auto mb-3" />
+            <Braces className="w-8 h-8 text-hacker-muted mx-auto mb-3" />
             <p className="text-hacker-muted font-mono">// aucune idée trouvée</p>
           </div>
         ) : (
@@ -305,6 +316,12 @@ export default function GalleryPage() {
                           <span>
                             {new Date(prompt.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
                           </span>
+                          {prompt.comments_count > 0 && (
+                            <span className="flex items-center gap-1">
+                              <MessageSquare className="w-3 h-3" />
+                              {prompt.comments_count}
+                            </span>
+                          )}
                           {plan?.feasibility_score !== undefined && (
                             <ScoreBar score={plan.feasibility_score} />
                           )}
@@ -324,9 +341,9 @@ export default function GalleryPage() {
                           if (isWinner) {
                             return (
                               <div className="flex items-center gap-1.5 text-hacker-amber">
-                                <Trophy className="w-4 h-4" />
+                                <Shield className="w-4 h-4" />
                                 <span className="text-sm font-mono font-bold">{prompt.votes_count}</span>
-                                {prompt.status === 'building' && <Hammer className="w-3.5 h-3.5 animate-pulse" />}
+                                {prompt.status === 'building' && <Wrench className="w-3.5 h-3.5 animate-pulse" />}
                               </div>
                             );
                           }
@@ -334,7 +351,7 @@ export default function GalleryPage() {
                           if (isClosed || (isEvaluated && deadlinePassed)) {
                             return (
                               <div className="flex items-center gap-1.5 text-hacker-muted">
-                                <ThumbsUp className="w-4 h-4" />
+                                <ChevronUp className="w-4 h-4" />
                                 <span className="text-sm font-mono">{prompt.votes_count}</span>
                                 <span className="text-[10px] font-mono ml-1">CLOS</span>
                               </div>
@@ -353,7 +370,7 @@ export default function GalleryPage() {
                                     : 'text-hacker-muted-light'
                               }`}
                             >
-                              <ThumbsUp className={`w-4 h-4 ${isVoting ? 'animate-pulse' : ''}`} />
+                              <ChevronUp className={`w-4 h-4 ${isVoting ? 'animate-pulse' : ''}`} />
                               <span className="text-sm font-mono">{prompt.votes_count}</span>
                             </button>
                           );
@@ -376,7 +393,7 @@ export default function GalleryPage() {
 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                           <div className="flex items-center gap-2 text-xs font-mono">
-                            <DollarSign className="w-3.5 h-3.5 text-hacker-green" />
+                            <CircuitBoard className="w-3.5 h-3.5 text-hacker-green" />
                             <div>
                               <div className="text-hacker-muted">Potentiel</div>
                               <div className="text-hacker-green">{plan.estimated_revenue_potential}</div>
@@ -397,7 +414,7 @@ export default function GalleryPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2 text-xs font-mono">
-                            <Target className="w-3.5 h-3.5 text-hacker-purple" />
+                            <Crosshair className="w-3.5 h-3.5 text-hacker-purple" />
                             <div>
                               <div className="text-hacker-muted">Score</div>
                               <div className={verdict?.color || 'text-white'}>{plan.feasibility_score}/100</div>
@@ -485,6 +502,9 @@ export default function GalleryPage() {
                           )}
                         </div>
                       </div>
+
+                      {/* Comments */}
+                      <PromptComments promptId={prompt.id} />
                     </div>
                   )}
                 </div>
@@ -497,13 +517,13 @@ export default function GalleryPage() {
       {/* SUBMIT CTA */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
         <div className="card p-6 text-center border border-hacker-green/20 hover:border-hacker-green/40 transition-all">
-          <Lightbulb className="w-8 h-8 text-hacker-green mx-auto mb-3" />
+          <Braces className="w-8 h-8 text-hacker-green mx-auto mb-3" />
           <h3 className="text-lg font-bold text-white mb-2">Tu as une idée de business ?</h3>
           <p className="text-sm text-hacker-muted-light mb-4">
             Soumets-la gratuitement. 6 agents IA l&apos;évaluent, scorent sa faisabilité et créent un plan d&apos;action complet.
           </p>
           <Link href="/" className="btn-primary inline-flex items-center gap-2">
-            <Lightbulb className="w-4 h-4" />
+            <Braces className="w-4 h-4" />
             Soumettre mon idée
           </Link>
         </div>

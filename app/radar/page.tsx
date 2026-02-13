@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { ThumbsUp, Copy, ExternalLink, ArrowLeft, Rocket, Eye, FlaskConical, Package, Terminal, DollarSign, TrendingUp, ArrowRight, Lightbulb } from 'lucide-react';
+import { ChevronUp, Copy, ExternalLink, ArrowLeft, Zap, Eye, FlaskConical, HardDrive, Terminal, CircuitBoard, TrendingUp, ArrowRight, Braces } from 'lucide-react';
 import Link from 'next/link';
 import { supabase, AGENTS } from '@/lib/supabase';
 
@@ -110,44 +110,38 @@ export default function RadarPage() {
   const [revenue, setRevenue] = useState<RevenueEntry[]>([]);
   const [revenueTotal, setRevenueTotal] = useState(0);
   const [pipelineCounts, setPipelineCounts] = useState({ pending: 0, evaluating: 0, evaluated: 0, shipped: 3 });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchAll() {
-      // Fetch user prompts (live ideas)
-      const { data: prompts } = await supabase
-        .from('user_prompts')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(30);
-      if (prompts) {
-        setIdeas(prompts);
-        setPipelineCounts({
-          pending: prompts.filter(p => p.status === 'pending').length,
-          evaluating: prompts.filter(p => p.status === 'evaluating').length,
-          evaluated: prompts.filter(p => p.status === 'evaluated').length,
-          shipped: 3,
-        });
-      }
+      try {
+        const [{ data: prompts }, { data: events }, { data: rev }] = await Promise.all([
+          supabase.from('user_prompts').select('*').order('created_at', { ascending: false }).limit(30),
+          supabase.from('ops_agent_events').select('id, agent_id, kind, title, summary, created_at').order('created_at', { ascending: false }).limit(8),
+          supabase.from('ops_revenue').select('*').order('created_at', { ascending: false }).limit(20),
+        ]);
 
-      // Fetch recent agent events for activity feed
-      const { data: events } = await supabase
-        .from('ops_agent_events')
-        .select('id, agent_id, kind, title, summary, created_at')
-        .order('created_at', { ascending: false })
-        .limit(8);
-      if (events) setActivity(events);
-
-      // Fetch revenue
-      const { data: rev } = await supabase
-        .from('ops_revenue')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(20);
-      if (rev) {
-        setRevenue(rev);
-        setRevenueTotal(rev.reduce((sum, r) => sum + Number(r.amount), 0));
+        if (prompts) {
+          setIdeas(prompts);
+          setPipelineCounts({
+            pending: prompts.filter(p => p.status === 'pending').length,
+            evaluating: prompts.filter(p => p.status === 'evaluating').length,
+            evaluated: prompts.filter(p => p.status === 'evaluated').length,
+            shipped: 3,
+          });
+        }
+        if (events) setActivity(events);
+        if (rev) {
+          setRevenue(rev);
+          setRevenueTotal(rev.reduce((sum, r) => sum + Number(r.amount), 0));
+        }
+      } catch (err) {
+        console.error('Radar fetchAll error:', err);
+      } finally {
+        setLoading(false);
       }
     }
+    const timeout = setTimeout(() => setLoading(false), 8000);
     fetchAll();
 
     // Realtime for revenue + prompts
@@ -174,7 +168,7 @@ export default function RadarPage() {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { clearTimeout(timeout); supabase.removeChannel(channel); };
   }, []);
 
   // Map prompt status to radar status
@@ -221,8 +215,8 @@ export default function RadarPage() {
   const pipelineStats = [
     { label: 'En attente', count: pipelineCounts.pending, sub: 'Idées soumises', icon: Eye },
     { label: 'Évaluation', count: pipelineCounts.evaluating, sub: 'Analyse IA', icon: FlaskConical },
-    { label: 'Prometteuses', count: pipelineCounts.evaluated, sub: 'Plan généré', icon: Rocket },
-    { label: 'Livré', count: pipelineCounts.shipped, sub: 'Produits live', icon: Package },
+    { label: 'Prometteuses', count: pipelineCounts.evaluated, sub: 'Plan généré', icon: Zap },
+    { label: 'Livré', count: pipelineCounts.shipped, sub: 'Produits live', icon: HardDrive },
   ];
 
   const statColors = [
@@ -238,6 +232,17 @@ export default function RadarPage() {
     { value: 'validating', label: `evaluating (${pipelineCounts.evaluating})` },
     { value: 'building', label: `promising (${pipelineCounts.evaluated})` },
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-hacker-bg bg-grid flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-hacker-green border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-hacker-green font-mono text-sm">// chargement du radar...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-grid min-h-screen">
@@ -301,7 +306,7 @@ export default function RadarPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Package className="w-5 h-5 text-hacker-green" />
+            <HardDrive className="w-5 h-5 text-hacker-green" />
             <h2 className="text-xl font-bold text-white">Succès</h2>
           </div>
           <span className="text-sm text-hacker-muted-light">{successStories.length} déployés</span>
@@ -366,7 +371,7 @@ export default function RadarPage() {
 
         {filteredIdeas.length === 0 ? (
           <div className="card p-8 text-center">
-            <Lightbulb className="w-8 h-8 text-hacker-muted mx-auto mb-3" />
+            <Braces className="w-8 h-8 text-hacker-muted mx-auto mb-3" />
             <p className="text-hacker-muted font-mono text-sm">// aucune idée dans ce filtre</p>
           </div>
         ) : (
@@ -411,7 +416,7 @@ export default function RadarPage() {
 
                   <div className="flex items-center gap-3">
                     <span className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono btn-secondary !py-1.5 !px-3 !text-xs">
-                      <ThumbsUp className="w-3.5 h-3.5" />
+                      <ChevronUp className="w-3.5 h-3.5" />
                       {idea.votes_count || 0}
                     </span>
                     {idea.ai_plan && (
@@ -476,7 +481,7 @@ export default function RadarPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <DollarSign className="w-5 h-5 text-hacker-green" />
+            <CircuitBoard className="w-5 h-5 text-hacker-green" />
             <h2 className="text-xl font-bold text-white">Revenus</h2>
             <span className="badge badge-live">LIVE</span>
           </div>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Pin, ArrowRight, FileText, BookOpen } from 'lucide-react';
+import { Hash, ArrowRight, FileCode, Terminal } from 'lucide-react';
 
 const insights = [
   {
@@ -212,7 +212,7 @@ export default function InsightsPage() {
                       {article.type === 'insight' ? 'insight' : 'article'}
                     </span>
                     <span className="flex items-center gap-1.5 text-xs text-hacker-green font-mono">
-                      <Pin className="w-3 h-3" />
+                      <Hash className="w-3 h-3" />
                       ÉPINGLÉ
                     </span>
                     <span className="text-xs text-hacker-muted">{article.date}</span>

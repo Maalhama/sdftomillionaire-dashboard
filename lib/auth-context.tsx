@@ -99,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setProfile(null);
     setSession(null);
+    window.location.href = '/?logged_out=1';
   };
 
   const refreshProfile = async () => {

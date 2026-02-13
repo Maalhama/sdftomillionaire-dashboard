@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { supabase, AGENTS, AgentId } from '@/lib/supabase';
-import { Brain, Filter, Clock, Tag, Sparkles } from 'lucide-react';
+import { Brain, Filter, Clock, Tag, Zap } from 'lucide-react';
 
 interface Memory {
   id: string;
@@ -41,26 +41,32 @@ export default function MemoriesPage() {
 
   useEffect(() => {
     fetchMemories();
-    
+    const timeout = setTimeout(() => setLoading(false), 8000);
+
     const channel = supabase
       .channel('memories')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ops_agent_memory' }, (payload) => {
         setMemories(prev => [payload.new as Memory, ...prev]);
       })
       .subscribe();
-    
-    return () => { supabase.removeChannel(channel); };
+
+    return () => { clearTimeout(timeout); supabase.removeChannel(channel); };
   }, []);
 
   async function fetchMemories() {
-    const { data } = await supabase
-      .from('ops_agent_memory')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(100);
-    
-    setMemories(data || []);
-    setLoading(false);
+    try {
+      const { data } = await supabase
+        .from('ops_agent_memory')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      setMemories(data || []);
+    } catch (err) {
+      console.error('Memories fetchMemories error:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const filteredMemories = memories.filter(m => {
@@ -285,7 +291,7 @@ export default function MemoriesPage() {
           <div className="border-t border-hacker-border p-3 bg-hacker-terminal">
             <div className="flex items-center justify-center gap-4 text-[10px] font-mono text-hacker-muted">
               <span className="flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-hacker-green" />
+                <Zap className="w-3 h-3 text-hacker-green" />
                 Realtime Supabase
               </span>
               <span>|</span>

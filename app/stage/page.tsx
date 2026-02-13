@@ -91,61 +91,46 @@ export default function StagePage() {
   const [activeRoundtable, setActiveRoundtable] = useState<Roundtable | null>(null);
 
   const fetchData = useCallback(async () => {
-    // Fetch recent events
-    const { data: eventsData } = await supabase
-      .from('ops_agent_events')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(30);
-    
-    setEvents(eventsData || []);
+    try {
+      const [
+        { data: eventsData },
+        { data: statsData },
+        { count: completedCount },
+        { count: totalCount },
+        { data: roundtableData },
+      ] = await Promise.all([
+        supabase.from('ops_agent_events').select('*').order('created_at', { ascending: false }).limit(30),
+        supabase.from('ops_agent_stats').select('*'),
+        supabase.from('ops_missions').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
+        supabase.from('ops_missions').select('*', { count: 'exact', head: true }),
+        supabase.from('ops_roundtable_queue').select('*').or('status.eq.running,status.eq.pending,status.eq.succeeded').order('created_at', { ascending: false }).limit(1),
+      ]);
 
-    // Fetch agent stats
-    const { data: statsData } = await supabase
-      .from('ops_agent_stats')
-      .select('*');
-    
-    setAgentStats(statsData || []);
-
-    // Fetch mission counts
-    const { count: completedCount } = await supabase
-      .from('ops_missions')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'completed');
-
-    const { count: totalCount } = await supabase
-      .from('ops_missions')
-      .select('*', { count: 'exact', head: true });
-
-    setMissionCount({
-      completed: completedCount || 0,
-      total: totalCount || 10
-    });
-
-    // Fetch latest roundtable (running or most recent)
-    const { data: roundtableData } = await supabase
-      .from('ops_roundtable_queue')
-      .select('*')
-      .or('status.eq.running,status.eq.pending,status.eq.succeeded')
-      .order('created_at', { ascending: false })
-      .limit(1);
-    
-    if (roundtableData && roundtableData[0]) {
-      setActiveRoundtable(roundtableData[0] as Roundtable);
+      setEvents(eventsData || []);
+      setAgentStats(statsData || []);
+      setMissionCount({ completed: completedCount || 0, total: totalCount || 10 });
+      if (roundtableData?.[0]) {
+        setActiveRoundtable(roundtableData[0] as Roundtable);
+      }
+    } catch (err) {
+      console.error('Stage fetchData error:', err);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }, []);
 
   useEffect(() => {
     fetchData();
     setNow(new Date());
 
+    // Safety timeout: force loading off after 8s
+    const timeout = setTimeout(() => setLoading(false), 8000);
+
     // Subscribe to realtime events
     const channel = supabase
       .channel('stage-events')
-      .on('postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'ops_agent_events' }, 
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'ops_agent_events' },
         (payload) => {
           setEvents(prev => [payload.new as Event, ...prev.slice(0, 29)]);
         }
@@ -160,7 +145,7 @@ export default function StagePage() {
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { clearTimeout(timeout); supabase.removeChannel(channel); };
   }, [fetchData]);
 
   useEffect(() => {
