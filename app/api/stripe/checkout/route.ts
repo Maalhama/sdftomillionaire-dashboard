@@ -18,7 +18,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 });
     }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.split(' ')[1]);
+    const token = authHeader.slice(7);
+    if (!token) {
+      return NextResponse.json({ error: 'Token manquant.' }, { status: 401 });
+    }
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       return NextResponse.json({ error: 'Token invalide.' }, { status: 401 });
     }

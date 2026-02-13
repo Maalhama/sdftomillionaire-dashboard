@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState, useCallback } from 'react';
 import { ArrowRight, Send, Cpu, Users, Zap, Activity, Trophy, LogOut } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase, AGENTS } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
 const MAX_CHARS = 350;
@@ -54,14 +54,10 @@ const STEPS = [
   },
 ];
 
-const agentMetadata: Record<string, { name: string; role: string; avatar: string; color: string }> = {
-  'opus': { name: 'CEO', role: 'Chef des Opérations', avatar: '/agents/opus.png', color: '#f59e0b' },
-  'brain': { name: 'Kira', role: 'Chef de Recherche', avatar: '/agents/brain.png', color: '#8b5cf6' },
-  'growth': { name: 'Madara', role: 'Spécialiste Croissance', avatar: '/agents/growth.png', color: '#22c55e' },
-  'creator': { name: 'Stark', role: 'Directeur Créatif', avatar: '/agents/creator.jpg', color: '#ec4899' },
-  'twitter-alt': { name: 'L', role: 'Directeur Réseaux Sociaux', avatar: '/agents/twitter-alt.png', color: '#3b82f6' },
-  'company-observer': { name: 'Usopp', role: 'Auditeur Opérations', avatar: '/agents/company-observer.jpg', color: '#ef4444' },
-};
+// Agent metadata centralisé dans lib/supabase.ts
+const agentMetadata = Object.fromEntries(
+  Object.entries(AGENTS).map(([id, agent]) => [id, { ...agent }])
+);
 
 export default function HomePage() {
   const { user, profile } = useAuth();

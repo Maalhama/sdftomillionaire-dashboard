@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       .from('user_prompts')
       .insert({
         content: trimmed,
-        author_name: typeof author_name === 'string' && author_name.trim() ? author_name.trim() : 'Anonyme',
+        author_name: (typeof author_name === 'string' && author_name.trim() ? author_name.trim() : 'Anonyme').slice(0, 50),
         ip_hash: ipHash,
       });
 

@@ -52,8 +52,10 @@ export async function POST(
     const authHeader = request.headers.get('authorization');
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.slice(7);
-      const { data: { user } } = await supabase.auth.getUser(token);
-      userId = user?.id ?? null;
+      if (token) {
+        const { data: { user } } = await supabase.auth.getUser(token);
+        userId = user?.id ?? null;
+      }
     }
 
     // Hash IP (fallback pour les anonymes)
@@ -117,33 +119,44 @@ export async function POST(
       );
     }
 
-    // Incrémenter le compteur prompt
-    const { error: updateError } = await supabase
-      .from('user_prompts')
-      .update({ votes_count: (prompt.votes_count || 0) + 1 })
-      .eq('id', id);
+    // Incrémenter le compteur prompt (atomic via SQL)
+    const { error: updateError } = await supabase.rpc('increment_counter', {
+      table_name: 'user_prompts',
+      column_name: 'votes_count',
+      row_id: id,
+    });
 
     if (updateError) {
-      console.error('Vote count update error:', updateError);
-      return NextResponse.json(
-        { error: 'Erreur lors de la mise à jour du compteur.' },
-        { status: 500 }
-      );
+      // Fallback: incrémentation directe si la RPC n'existe pas encore
+      console.warn('RPC increment_counter not available, using fallback:', updateError.message);
+      await supabase
+        .from('user_prompts')
+        .update({ votes_count: (prompt.votes_count || 0) + 1 })
+        .eq('id', id);
     }
 
-    // Incrémenter le compteur profil si connecté
+    // Incrémenter le compteur profil si connecté (atomic via SQL)
     if (userId) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('votes_count')
-        .eq('id', userId)
-        .single();
+      const { error: profileError } = await supabase.rpc('increment_counter', {
+        table_name: 'profiles',
+        column_name: 'votes_count',
+        row_id: userId,
+      });
 
-      if (profile) {
-        await supabase
+      if (profileError) {
+        // Fallback
+        const { data: profile } = await supabase
           .from('profiles')
-          .update({ votes_count: (profile.votes_count || 0) + 1 })
-          .eq('id', userId);
+          .select('votes_count')
+          .eq('id', userId)
+          .single();
+
+        if (profile) {
+          await supabase
+            .from('profiles')
+            .update({ votes_count: (profile.votes_count || 0) + 1 })
+            .eq('id', userId);
+        }
       }
     }
 
@@ -151,7 +164,8 @@ export async function POST(
       success: true,
       votes_count: (prompt.votes_count || 0) + 1,
     });
-  } catch {
+  } catch (err) {
+    console.error('Vote error:', err);
     return NextResponse.json(
       { error: 'Requête invalide.' },
       { status: 400 }

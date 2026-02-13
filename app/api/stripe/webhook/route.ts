@@ -51,6 +51,18 @@ export async function POST(req: NextRequest) {
 
     const supabase = getSupabase();
 
+    // Idempotency check: skip if already processed
+    const { data: existingPurchase } = await supabase
+      .from('credit_purchases')
+      .select('status')
+      .eq('stripe_session_id', session.id)
+      .single();
+
+    if (existingPurchase?.status === 'completed') {
+      console.log('Webhook already processed:', session.id);
+      return NextResponse.json({ received: true });
+    }
+
     // Mark purchase as completed
     await supabase
       .from('credit_purchases')

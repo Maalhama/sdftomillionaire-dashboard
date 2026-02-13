@@ -37,7 +37,7 @@ export async function POST(
 
     if (tool.status !== 'published') {
       return NextResponse.json(
-        { error: 'Outil non disponible.' },
+        { error: `Outil non disponible (statut: ${tool.status}).` },
         { status: 400 }
       );
     }
@@ -51,7 +51,15 @@ export async function POST(
       );
     }
 
-    const { data: { user } } = await supabase.auth.getUser(authHeader.slice(7));
+    const token = authHeader.slice(7);
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Token manquant.', code: 'AUTH_REQUIRED' },
+        { status: 401 }
+      );
+    }
+
+    const { data: { user } } = await supabase.auth.getUser(token);
     if (!user) {
       return NextResponse.json(
         { error: 'Token invalide.', code: 'AUTH_REQUIRED' },
@@ -78,13 +86,23 @@ export async function POST(
       );
     }
 
-    // Déduire les crédits
+    // Déduire les crédits (atomic via RPC)
     const newBalance = credits.balance - DOWNLOAD_COST;
     const newLifetimeSpent = (credits.lifetime_spent || 0) + DOWNLOAD_COST;
-    await supabase
-      .from('user_credits')
-      .update({ balance: newBalance, lifetime_spent: newLifetimeSpent })
-      .eq('user_id', user.id);
+
+    const { error: creditError } = await supabase.rpc('deduct_credits', {
+      p_user_id: user.id,
+      p_amount: DOWNLOAD_COST,
+    });
+
+    if (creditError) {
+      // Fallback si la RPC n'existe pas
+      console.warn('RPC deduct_credits not available, using fallback:', creditError.message);
+      await supabase
+        .from('user_credits')
+        .update({ balance: newBalance, lifetime_spent: newLifetimeSpent })
+        .eq('user_id', user.id);
+    }
 
     // Log la transaction
     await supabase.from('credit_transactions').insert({
@@ -106,24 +124,41 @@ export async function POST(
       .from('tool_downloads')
       .insert({ tool_id: id, ip_hash: ipHash, user_id: user.id });
 
-    // Incrémenter le compteur de l'outil
-    await supabase
-      .from('tools')
-      .update({ downloads_count: (tool.downloads_count || 0) + 1 })
-      .eq('id', id);
+    // Incrémenter le compteur de l'outil (atomic via RPC)
+    const { error: toolCountError } = await supabase.rpc('increment_counter', {
+      table_name: 'tools',
+      column_name: 'downloads_count',
+      row_id: id,
+    });
 
-    // Incrémenter le compteur du profil
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('downloads_count')
-      .eq('id', user.id)
-      .single();
-
-    if (profile) {
+    if (toolCountError) {
+      console.warn('RPC increment_counter not available for tools:', toolCountError.message);
       await supabase
+        .from('tools')
+        .update({ downloads_count: (tool.downloads_count || 0) + 1 })
+        .eq('id', id);
+    }
+
+    // Incrémenter le compteur du profil (atomic via RPC)
+    const { error: profileCountError } = await supabase.rpc('increment_counter', {
+      table_name: 'profiles',
+      column_name: 'downloads_count',
+      row_id: user.id,
+    });
+
+    if (profileCountError) {
+      const { data: profile } = await supabase
         .from('profiles')
-        .update({ downloads_count: (profile.downloads_count || 0) + 1 })
-        .eq('id', user.id);
+        .select('downloads_count')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        await supabase
+          .from('profiles')
+          .update({ downloads_count: (profile.downloads_count || 0) + 1 })
+          .eq('id', user.id);
+      }
     }
 
     return NextResponse.json({
@@ -131,7 +166,8 @@ export async function POST(
       downloads_count: (tool.downloads_count || 0) + 1,
       credits_remaining: newBalance,
     });
-  } catch {
+  } catch (err) {
+    console.error('Download error:', err);
     return NextResponse.json(
       { error: 'Erreur serveur.' },
       { status: 500 }

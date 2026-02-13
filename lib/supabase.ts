@@ -1,9 +1,18 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://snflassnlynlvxdpjzmu.supabase.co';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuZmxhc3NubHlubHZ4ZHBqem11Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4MzM1MjEsImV4cCI6MjA4NjQwOTUyMX0.9CEmIJXqjdx_hz513BAhReYl-pHX9MLQLT6fDn326mo';
+let _supabase: SupabaseClient | null = null;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    if (!_supabase) {
+      _supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    }
+    return (_supabase as unknown as Record<string, unknown>)[prop as string];
+  },
+});
 
 export const AGENTS = {
   opus: { name: 'CEO', emoji: '🎩', avatar: '/agents/opus.png', role: 'Chef des Opérations', color: '#f59e0b' },

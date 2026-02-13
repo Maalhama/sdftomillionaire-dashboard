@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+export const dynamic = 'force-dynamic';
+
 function getSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,19 +12,20 @@ function getSupabase() {
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = getSupabase();
-  const promptId = params.id;
+  const { id: promptId } = await params;
 
   const { data: comments, error } = await supabase
     .from('prompt_comments')
-    .select('id, content, created_at, user_id, profiles(display_name, username, avatar_url)')
+    .select('id, content, created_at, user_id, author_name')
     .eq('prompt_id', promptId)
     .order('created_at', { ascending: true })
     .limit(100);
 
   if (error) {
+    console.error('Comments fetch error:', error);
     return NextResponse.json({ error: 'Erreur lors du chargement.' }, { status: 500 });
   }
 
@@ -31,24 +34,32 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = getSupabase();
-  const promptId = params.id;
+  const { id: promptId } = await params;
 
-  // Auth required
+  // Auth optionnelle
+  let userId: string | null = null;
   const authHeader = req.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Connexion requise.' }, { status: 401 });
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    if (token) {
+      const { data: { user } } = await supabase.auth.getUser(token);
+      userId = user?.id ?? null;
+    }
   }
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.split(' ')[1]);
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Token invalide.' }, { status: 401 });
+  let body;
+  try {
+    body = await req.json();
+  } catch (err) {
+    console.error('Comments parse error:', err);
+    return NextResponse.json({ error: 'Requête invalide.' }, { status: 400 });
   }
 
-  const body = await req.json();
   const content = body.content?.trim();
+  const authorName = (body.author_name?.trim() || 'Anonyme').slice(0, 50);
 
   if (!content || content.length === 0) {
     return NextResponse.json({ error: 'Commentaire vide.' }, { status: 400 });
@@ -73,13 +84,15 @@ export async function POST(
     .from('prompt_comments')
     .insert({
       prompt_id: promptId,
-      user_id: user.id,
+      user_id: userId,
+      author_name: authorName,
       content,
     })
-    .select('id, content, created_at, user_id')
+    .select('id, content, created_at, user_id, author_name')
     .single();
 
   if (insertError) {
+    console.error('Comment insert error:', insertError);
     return NextResponse.json({ error: 'Erreur lors de l\'ajout.' }, { status: 500 });
   }
 
