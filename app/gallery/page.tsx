@@ -18,6 +18,8 @@ import {
   DollarSign,
   Timer,
   Users,
+  Trophy,
+  Hammer,
 } from 'lucide-react';
 
 interface AiPlan {
@@ -55,7 +57,10 @@ const verdictConfig: Record<string, { label: string; color: string; badge: strin
 const statusConfig: Record<string, { label: string; badge: string }> = {
   pending: { label: 'EN ATTENTE', badge: 'badge badge-muted' },
   evaluating: { label: 'ANALYSE...', badge: 'badge badge-amber' },
-  evaluated: { label: 'EVALUÉ', badge: 'badge badge-live' },
+  evaluated: { label: 'VOTE OUVERT', badge: 'badge badge-live' },
+  winner: { label: 'GAGNANT', badge: 'badge badge-live' },
+  building: { label: 'EN CONSTRUCTION', badge: 'badge badge-amber' },
+  closed: { label: 'CLOS', badge: 'badge badge-muted' },
 };
 
 const effortBadge: Record<string, string> = {
@@ -100,7 +105,7 @@ export default function GalleryPage() {
   const [prompts, setPrompts] = useState<UserPrompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'evaluated' | 'pending'>('all');
+  const [filter, setFilter] = useState<'all' | 'evaluated' | 'pending' | 'winners'>('all');
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
   const [votingId, setVotingId] = useState<string | null>(null);
 
@@ -166,15 +171,18 @@ export default function GalleryPage() {
   const filtered = prompts.filter(p => {
     if (filter === 'evaluated') return p.status === 'evaluated';
     if (filter === 'pending') return p.status === 'pending' || p.status === 'evaluating';
+    if (filter === 'winners') return p.status === 'winner' || p.status === 'building';
     return true;
   });
 
   const evaluatedCount = prompts.filter(p => p.status === 'evaluated').length;
   const pendingCount = prompts.filter(p => p.status === 'pending' || p.status === 'evaluating').length;
+  const winnersCount = prompts.filter(p => p.status === 'winner' || p.status === 'building').length;
 
   const filters = [
     { value: 'all' as const, label: `all (${prompts.length})` },
-    { value: 'evaluated' as const, label: `evaluated (${evaluatedCount})` },
+    { value: 'winners' as const, label: `gagnants (${winnersCount})` },
+    { value: 'evaluated' as const, label: `votes (${evaluatedCount})` },
     { value: 'pending' as const, label: `pending (${pendingCount})` },
   ];
 
@@ -197,17 +205,21 @@ export default function GalleryPage() {
       {/* STATS */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
         <div className="card p-6">
-          <div className="grid grid-cols-3 gap-6 text-center">
+          <div className="grid grid-cols-4 gap-6 text-center">
             <div>
               <div className="text-3xl font-bold text-hacker-green">{prompts.length}</div>
               <div className="text-sm text-hacker-muted-light">Idées soumises</div>
             </div>
             <div>
               <div className="text-3xl font-bold text-hacker-cyan">{evaluatedCount}</div>
-              <div className="text-sm text-hacker-muted-light">Évaluées par l&apos;IA</div>
+              <div className="text-sm text-hacker-muted-light">Votes ouverts</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-hacker-amber">{pendingCount}</div>
+              <div className="text-3xl font-bold text-hacker-amber">{winnersCount}</div>
+              <div className="text-sm text-hacker-muted-light">Gagnants</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-hacker-muted-light">{pendingCount}</div>
               <div className="text-sm text-hacker-muted-light">En attente</div>
             </div>
           </div>
@@ -296,12 +308,24 @@ export default function GalleryPage() {
                       <div className="flex items-center gap-3 shrink-0">
                         {(() => {
                           const isEvaluated = prompt.status === 'evaluated';
+                          const isWinner = prompt.status === 'winner' || prompt.status === 'building';
+                          const isClosed = prompt.status === 'closed';
                           const deadlinePassed = !prompt.voting_deadline || new Date(prompt.voting_deadline) <= new Date();
                           const hasVoted = votedIds.has(prompt.id);
                           const isVoting = votingId === prompt.id;
                           const canVote = isEvaluated && !deadlinePassed && !hasVoted && !isVoting;
 
-                          if (isEvaluated && deadlinePassed) {
+                          if (isWinner) {
+                            return (
+                              <div className="flex items-center gap-1.5 text-hacker-amber">
+                                <Trophy className="w-4 h-4" />
+                                <span className="text-sm font-mono font-bold">{prompt.votes_count}</span>
+                                {prompt.status === 'building' && <Hammer className="w-3.5 h-3.5 animate-pulse" />}
+                              </div>
+                            );
+                          }
+
+                          if (isClosed || (isEvaluated && deadlinePassed)) {
                             return (
                               <div className="flex items-center gap-1.5 text-hacker-muted">
                                 <ThumbsUp className="w-4 h-4" />
