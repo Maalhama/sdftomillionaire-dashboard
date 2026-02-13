@@ -9,7 +9,8 @@ interface Comment {
   id: string;
   content: string;
   created_at: string;
-  user_id: string;
+  user_id: string | null;
+  author_name: string | null;
   profiles?: {
     display_name: string | null;
     username: string | null;
@@ -18,11 +19,21 @@ interface Comment {
 }
 
 export default function PromptComments({ promptId }: { promptId: string }) {
-  const { user, session } = useAuth();
+  const { user, session, profile } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
+  const [authorName, setAuthorName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Auto-fill author name from profile
+  useEffect(() => {
+    if (profile?.display_name) {
+      setAuthorName(profile.display_name);
+    } else if (profile?.username) {
+      setAuthorName(profile.username);
+    }
+  }, [profile]);
 
   const fetchComments = useCallback(async () => {
     try {
@@ -56,17 +67,24 @@ export default function PromptComments({ promptId }: { promptId: string }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || submitting || !session?.access_token) return;
+    if (!newComment.trim() || submitting) return;
 
     setSubmitting(true);
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+      }
+
       const res = await fetch(`/api/prompts/${promptId}/comments`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ content: newComment.trim() }),
+        headers,
+        body: JSON.stringify({
+          content: newComment.trim(),
+          author_name: authorName.trim() || 'Anonyme',
+        }),
       });
 
       if (res.ok) {
@@ -91,7 +109,7 @@ export default function PromptComments({ promptId }: { promptId: string }) {
   };
 
   const getDisplayName = (comment: Comment) => {
-    return comment.profiles?.display_name || comment.profiles?.username || 'Anonyme';
+    return comment.profiles?.display_name || comment.profiles?.username || comment.author_name || 'Anonyme';
   };
 
   return (
@@ -129,7 +147,7 @@ export default function PromptComments({ promptId }: { promptId: string }) {
                       day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
                     })}
                   </span>
-                  {user?.id === comment.user_id && (
+                  {user?.id && user.id === comment.user_id && (
                     <button
                       onClick={() => handleDelete(comment.id)}
                       className="opacity-0 group-hover:opacity-100 text-hacker-muted hover:text-hacker-red transition-all"
@@ -145,9 +163,19 @@ export default function PromptComments({ promptId }: { promptId: string }) {
         </div>
       )}
 
-      {/* Comment form */}
-      {user ? (
-        <form onSubmit={handleSubmit} className="flex items-center gap-2">
+      {/* Comment form — visible pour tous */}
+      <form onSubmit={handleSubmit} className="space-y-2">
+        {!user && (
+          <input
+            type="text"
+            value={authorName}
+            onChange={(e) => setAuthorName(e.target.value)}
+            placeholder="Ton pseudo"
+            maxLength={30}
+            className="w-full bg-hacker-terminal border border-hacker-border rounded px-3 py-1.5 text-xs text-hacker-text font-mono placeholder:text-hacker-muted focus:border-hacker-green/50 focus:outline-none transition-colors"
+          />
+        )}
+        <div className="flex items-center gap-2">
           <input
             type="text"
             value={newComment}
@@ -163,12 +191,8 @@ export default function PromptComments({ promptId }: { promptId: string }) {
           >
             <Send className={`w-3.5 h-3.5 ${submitting ? 'animate-pulse' : ''}`} />
           </button>
-        </form>
-      ) : (
-        <p className="text-[11px] text-hacker-muted font-mono">
-          <a href="/login" className="text-hacker-green hover:underline">Connecte-toi</a> pour commenter.
-        </p>
-      )}
+        </div>
+      </form>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   ChevronUp,
   ChevronDown,
   ChevronRight,
+  Heart,
   AlertTriangle,
   CheckCircle,
   XCircle,
@@ -331,30 +332,30 @@ export default function GalleryPage() {
 
                       <div className="flex items-center gap-3 shrink-0">
                         {(() => {
-                          const isEvaluated = prompt.status === 'evaluated';
                           const isWinner = prompt.status === 'winner' || prompt.status === 'building';
                           const isClosed = prompt.status === 'closed';
-                          const deadlinePassed = !prompt.voting_deadline || new Date(prompt.voting_deadline) <= new Date();
+                          const deadlinePassed = prompt.voting_deadline ? new Date(prompt.voting_deadline) <= new Date() : false;
                           const hasVoted = votedIds.has(prompt.id);
                           const isVoting = votingId === prompt.id;
-                          const canVote = isEvaluated && !deadlinePassed && !hasVoted && !isVoting;
+                          const canVote = !isClosed && !isWinner && !deadlinePassed && !hasVoted && !isVoting;
 
                           if (isWinner) {
                             return (
-                              <div className="flex items-center gap-1.5 text-hacker-amber">
-                                <Shield className="w-4 h-4" />
-                                <span className="text-sm font-mono font-bold">{prompt.votes_count}</span>
-                                {prompt.status === 'building' && <Wrench className="w-3.5 h-3.5 animate-pulse" />}
+                              <div className="flex flex-col items-center gap-0.5">
+                                <div className="flex items-center gap-1.5 text-hacker-amber">
+                                  <Shield className="w-5 h-5" />
+                                  {prompt.status === 'building' && <Wrench className="w-4 h-4 animate-pulse" />}
+                                </div>
+                                <span className="text-sm font-mono font-bold text-hacker-amber">{prompt.votes_count}</span>
                               </div>
                             );
                           }
 
-                          if (isClosed || (isEvaluated && deadlinePassed)) {
+                          if (isClosed || deadlinePassed) {
                             return (
-                              <div className="flex items-center gap-1.5 text-hacker-muted">
-                                <ChevronUp className="w-4 h-4" />
-                                <span className="text-sm font-mono">{prompt.votes_count}</span>
-                                <span className="text-[10px] font-mono ml-1">CLOS</span>
+                              <div className="flex flex-col items-center gap-0.5 text-hacker-muted">
+                                <Heart className="w-5 h-5" />
+                                <span className="text-xs font-mono">{prompt.votes_count}</span>
                               </div>
                             );
                           }
@@ -363,148 +364,162 @@ export default function GalleryPage() {
                             <button
                               onClick={(e) => canVote ? handleVote(prompt.id, e) : e.stopPropagation()}
                               disabled={!canVote}
-                              className={`flex items-center gap-1.5 px-2 py-1 rounded transition-all ${
+                              className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg transition-all ${
                                 hasVoted
-                                  ? 'text-hacker-green bg-hacker-green/10 border border-hacker-green/30'
+                                  ? 'text-hacker-green bg-hacker-green/10 border border-hacker-green/30 shadow-[0_0_10px_rgba(0,255,65,0.15)]'
                                   : canVote
-                                    ? 'text-hacker-muted-light hover:text-hacker-green hover:bg-hacker-green/5 border border-transparent hover:border-hacker-green/20'
-                                    : 'text-hacker-muted-light'
+                                    ? 'text-hacker-muted-light hover:text-hacker-green hover:bg-hacker-green/5 border border-hacker-border hover:border-hacker-green/30 hover:shadow-[0_0_10px_rgba(0,255,65,0.1)]'
+                                    : 'text-hacker-muted border border-transparent'
                               }`}
+                              title={hasVoted ? 'Déjà voté' : canVote ? 'Voter pour cette idée' : ''}
                             >
-                              <ChevronUp className={`w-4 h-4 ${isVoting ? 'animate-pulse' : ''}`} />
-                              <span className="text-sm font-mono">{prompt.votes_count}</span>
+                              <Heart className={`w-5 h-5 ${isVoting ? 'animate-pulse' : ''} ${hasVoted ? 'fill-current' : ''}`} />
+                              <span className="text-xs font-mono font-bold">{prompt.votes_count}</span>
                             </button>
                           );
                         })()}
-                        {plan && (
-                          isExpanded
-                            ? <ChevronUp className="w-5 h-5 text-hacker-muted" />
-                            : <ChevronDown className="w-5 h-5 text-hacker-muted" />
-                        )}
+                        {isExpanded
+                          ? <ChevronUp className="w-5 h-5 text-hacker-muted" />
+                          : <ChevronDown className="w-5 h-5 text-hacker-muted" />
+                        }
                       </div>
                     </div>
                   </div>
 
-                  {/* Expanded AI Plan */}
-                  {isExpanded && plan && (
+                  {/* Expanded content */}
+                  {isExpanded && (
                     <div className="border-t border-hacker-border bg-hacker-terminal">
-                      {/* Summary + Key Stats */}
-                      <div className="p-5 space-y-4">
-                        <p className="text-hacker-text text-sm leading-relaxed">{plan.summary}</p>
+                      {/* AI Plan (if evaluated) */}
+                      {plan && (
+                        <>
+                          {/* Summary + Key Stats */}
+                          <div className="p-5 space-y-4">
+                            <p className="text-hacker-text text-sm leading-relaxed">{plan.summary}</p>
 
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
-                          <div className="flex items-center gap-2 text-xs font-mono">
-                            <CircuitBoard className="w-3.5 h-3.5 text-hacker-green" />
-                            <div>
-                              <div className="text-hacker-muted">Potentiel</div>
-                              <div className="text-hacker-green">{plan.estimated_revenue_potential}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs font-mono">
-                            <Timer className="w-3.5 h-3.5 text-hacker-cyan" />
-                            <div>
-                              <div className="text-hacker-muted">Premier revenu</div>
-                              <div className="text-hacker-cyan">{plan.time_to_first_revenue}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs font-mono">
-                            <Zap className="w-3.5 h-3.5 text-hacker-amber" />
-                            <div>
-                              <div className="text-hacker-muted">Investissement</div>
-                              <div className="text-hacker-amber">{plan.required_investment}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs font-mono">
-                            <Crosshair className="w-3.5 h-3.5 text-hacker-purple" />
-                            <div>
-                              <div className="text-hacker-muted">Score</div>
-                              <div className={verdict?.color || 'text-white'}>{plan.feasibility_score}/100</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Steps */}
-                      {plan.steps && plan.steps.length > 0 && (
-                        <div className="border-t border-hacker-border p-5">
-                          <h4 className="text-xs uppercase tracking-wider text-hacker-green mb-3 font-mono">
-                            // étapes du plan
-                          </h4>
-                          <div className="space-y-2">
-                            {plan.steps.map((step, i) => (
-                              <div key={i} className="flex items-start gap-3 text-sm font-mono">
-                                <span className="text-hacker-muted shrink-0">{String(step.order || i + 1).padStart(2, '0')}.</span>
-                                <div className="flex-1">
-                                  <span className="text-white">{step.title}</span>
-                                  <span className="text-hacker-muted"> — {step.description}</span>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0 text-xs">
-                                  <span className={effortBadge[step.effort] || 'text-hacker-muted'}>
-                                    {step.effort}
-                                  </span>
-                                  <span className="text-hacker-muted">{step.duration_days}j</span>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
+                              <div className="flex items-center gap-2 text-xs font-mono">
+                                <CircuitBoard className="w-3.5 h-3.5 text-hacker-green" />
+                                <div>
+                                  <div className="text-hacker-muted">Potentiel</div>
+                                  <div className="text-hacker-green">{plan.estimated_revenue_potential}</div>
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Risks */}
-                      {plan.risks && plan.risks.length > 0 && (
-                        <div className="border-t border-hacker-border p-5">
-                          <h4 className="text-xs uppercase tracking-wider text-hacker-amber mb-3 font-mono">
-                            // risques identifiés
-                          </h4>
-                          <div className="space-y-2">
-                            {plan.risks.map((risk, i) => (
-                              <div key={i} className="text-sm font-mono">
-                                <span className={`text-xs mr-2 ${
-                                  risk.severity === 'high' ? 'text-hacker-red' : risk.severity === 'medium' ? 'text-hacker-amber' : 'text-hacker-green'
-                                }`}>
-                                  [{risk.severity.toUpperCase()}]
-                                </span>
-                                <span className="text-hacker-text">{risk.description}</span>
-                                <div className="ml-4 mt-1 text-xs text-hacker-muted">
-                                  mitigation: {risk.mitigation}
+                              <div className="flex items-center gap-2 text-xs font-mono">
+                                <Timer className="w-3.5 h-3.5 text-hacker-cyan" />
+                                <div>
+                                  <div className="text-hacker-muted">Premier revenu</div>
+                                  <div className="text-hacker-cyan">{plan.time_to_first_revenue}</div>
                                 </div>
                               </div>
-                            ))}
+                              <div className="flex items-center gap-2 text-xs font-mono">
+                                <Zap className="w-3.5 h-3.5 text-hacker-amber" />
+                                <div>
+                                  <div className="text-hacker-muted">Investissement</div>
+                                  <div className="text-hacker-amber">{plan.required_investment}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs font-mono">
+                                <Crosshair className="w-3.5 h-3.5 text-hacker-purple" />
+                                <div>
+                                  <div className="text-hacker-muted">Score</div>
+                                  <div className={verdict?.color || 'text-white'}>{plan.feasibility_score}/100</div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      )}
 
-                      {/* Skills + Agent Recommendation */}
-                      <div className="border-t border-hacker-border p-5">
-                        <div className="grid md:grid-cols-2 gap-4">
-                          {plan.required_skills && plan.required_skills.length > 0 && (
-                            <div>
-                              <h4 className="text-xs uppercase tracking-wider text-hacker-cyan mb-2 font-mono">
-                                // compétences requises
+                          {/* Steps */}
+                          {plan.steps && plan.steps.length > 0 && (
+                            <div className="border-t border-hacker-border p-5">
+                              <h4 className="text-xs uppercase tracking-wider text-hacker-green mb-3 font-mono">
+                                // étapes du plan
                               </h4>
-                              <div className="flex flex-wrap gap-1.5">
-                                {plan.required_skills.map((skill, i) => (
-                                  <span key={i} className="text-[11px] px-2 py-0.5 rounded border border-hacker-border text-hacker-muted-light font-mono">
-                                    {skill}
-                                  </span>
+                              <div className="space-y-2">
+                                {plan.steps.map((step, i) => (
+                                  <div key={i} className="flex items-start gap-3 text-sm font-mono">
+                                    <span className="text-hacker-muted shrink-0">{String(step.order || i + 1).padStart(2, '0')}.</span>
+                                    <div className="flex-1">
+                                      <span className="text-white">{step.title}</span>
+                                      <span className="text-hacker-muted"> — {step.description}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0 text-xs">
+                                      <span className={effortBadge[step.effort] || 'text-hacker-muted'}>
+                                        {step.effort}
+                                      </span>
+                                      <span className="text-hacker-muted">{step.duration_days}j</span>
+                                    </div>
+                                  </div>
                                 ))}
                               </div>
                             </div>
                           )}
-                          {plan.agents_recommendation && (
-                            <div>
-                              <h4 className="text-xs uppercase tracking-wider text-hacker-purple mb-2 font-mono">
-                                // avis des agents
+
+                          {/* Risks */}
+                          {plan.risks && plan.risks.length > 0 && (
+                            <div className="border-t border-hacker-border p-5">
+                              <h4 className="text-xs uppercase tracking-wider text-hacker-amber mb-3 font-mono">
+                                // risques identifiés
                               </h4>
-                              <p className="text-xs text-hacker-muted-light leading-relaxed">
-                                {plan.agents_recommendation}
-                              </p>
+                              <div className="space-y-2">
+                                {plan.risks.map((risk, i) => (
+                                  <div key={i} className="text-sm font-mono">
+                                    <span className={`text-xs mr-2 ${
+                                      risk.severity === 'high' ? 'text-hacker-red' : risk.severity === 'medium' ? 'text-hacker-amber' : 'text-hacker-green'
+                                    }`}>
+                                      [{risk.severity.toUpperCase()}]
+                                    </span>
+                                    <span className="text-hacker-text">{risk.description}</span>
+                                    <div className="ml-4 mt-1 text-xs text-hacker-muted">
+                                      mitigation: {risk.mitigation}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
-                        </div>
-                      </div>
 
-                      {/* Comments */}
+                          {/* Skills + Agent Recommendation */}
+                          <div className="border-t border-hacker-border p-5">
+                            <div className="grid md:grid-cols-2 gap-4">
+                              {plan.required_skills && plan.required_skills.length > 0 && (
+                                <div>
+                                  <h4 className="text-xs uppercase tracking-wider text-hacker-cyan mb-2 font-mono">
+                                    // compétences requises
+                                  </h4>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {plan.required_skills.map((skill, i) => (
+                                      <span key={i} className="text-[11px] px-2 py-0.5 rounded border border-hacker-border text-hacker-muted-light font-mono">
+                                        {skill}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {plan.agents_recommendation && (
+                                <div>
+                                  <h4 className="text-xs uppercase tracking-wider text-hacker-purple mb-2 font-mono">
+                                    // avis des agents
+                                  </h4>
+                                  <p className="text-xs text-hacker-muted-light leading-relaxed">
+                                    {plan.agents_recommendation}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Pending status message */}
+                      {!plan && (
+                        <div className="p-5 text-center">
+                          <p className="text-xs text-hacker-muted font-mono">
+                            <span className="text-hacker-green">$</span> en attente d&apos;analyse par les agents<span className="inline-block w-1.5 h-3.5 bg-hacker-green animate-blink ml-0.5" />
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Comments — always visible */}
                       <PromptComments promptId={prompt.id} />
                     </div>
                   )}
