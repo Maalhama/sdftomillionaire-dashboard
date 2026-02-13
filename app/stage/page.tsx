@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { Pause, Play, Monitor, CheckSquare, MessageCircle, Brain, Zap, MessageSquare, Rocket, Terminal, Activity, Eye, Search, PenTool, Megaphone, BarChart3, RefreshCw } from 'lucide-react';
+import { Pause, Play, Monitor, CheckSquare, MessageCircle, Brain, Zap, MessageSquare, Rocket, Terminal, Activity, Eye, Search, PenTool, Megaphone, BarChart3, RefreshCw, Wrench, CheckCircle, Package } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { supabase, AGENTS, AgentId } from '@/lib/supabase';
 
@@ -34,6 +34,14 @@ interface AgentStats {
   experience_points: number;
   total_missions: number;
   successful_missions: number;
+}
+
+interface ActiveBuild {
+  id: string;
+  content: string;
+  status: string;
+  ai_plan: { build_plan?: { project_name?: string } } | null;
+  created_at: string;
 }
 
 interface Roundtable {
@@ -89,6 +97,7 @@ export default function StagePage() {
   const [now, setNow] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeRoundtable, setActiveRoundtable] = useState<Roundtable | null>(null);
+  const [activeBuilds, setActiveBuilds] = useState<ActiveBuild[]>([]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -98,12 +107,14 @@ export default function StagePage() {
         { count: completedCount },
         { count: totalCount },
         { data: roundtableData },
+        { data: buildsData },
       ] = await Promise.all([
         supabase.from('ops_agent_events').select('*').order('created_at', { ascending: false }).limit(30),
         supabase.from('ops_agent_stats').select('*'),
         supabase.from('ops_missions').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
         supabase.from('ops_missions').select('*', { count: 'exact', head: true }),
         supabase.from('ops_roundtable_queue').select('*').or('status.eq.running,status.eq.pending,status.eq.succeeded').order('created_at', { ascending: false }).limit(1),
+        supabase.from('user_prompts').select('id, content, status, ai_plan, created_at').in('status', ['winner', 'building', 'completed', 'published']).order('created_at', { ascending: false }).limit(5),
       ]);
 
       setEvents(eventsData || []);
@@ -112,6 +123,7 @@ export default function StagePage() {
       if (roundtableData?.[0]) {
         setActiveRoundtable(roundtableData[0] as Roundtable);
       }
+      setActiveBuilds((buildsData as ActiveBuild[]) || []);
     } catch (err) {
       console.error('Stage fetchData error:', err);
     } finally {
@@ -487,6 +499,51 @@ export default function StagePage() {
           </div>
         </div>
       </div>
+
+      {/* Active Builds */}
+      {activeBuilds.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-5">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="font-mono text-sm text-hacker-green">// projets en construction</span>
+            <span className="badge badge-amber text-[10px]">{activeBuilds.length}</span>
+          </div>
+          <div className="space-y-2">
+            {activeBuilds.map((build) => {
+              const projectName = build.ai_plan?.build_plan?.project_name;
+              const isBuilding = build.status === 'building';
+              const isDone = build.status === 'completed' || build.status === 'published';
+
+              return (
+                <div key={build.id} className="card-terminal p-3">
+                  <div className="flex items-center gap-3 font-mono text-xs">
+                    <span className="flex-shrink-0">
+                      {isBuilding ? (
+                        <Wrench className="w-4 h-4 text-hacker-amber animate-pulse" />
+                      ) : isDone ? (
+                        <CheckCircle className="w-4 h-4 text-hacker-green" />
+                      ) : (
+                        <Package className="w-4 h-4 text-hacker-cyan" />
+                      )}
+                    </span>
+                    <span className={`badge ${isBuilding ? 'badge-amber' : isDone ? 'badge-live' : 'badge-muted'} text-[10px]`}>
+                      {build.status === 'winner' ? 'GAGNANT' : build.status === 'building' ? 'EN CONSTRUCTION' : build.status === 'completed' ? 'TERMINÉ' : 'PUBLIÉ'}
+                    </span>
+                    {projectName && (
+                      <span className="text-hacker-amber font-bold">{projectName}</span>
+                    )}
+                    <span className="text-hacker-text truncate flex-1">
+                      &ldquo;{build.content.slice(0, 80)}{build.content.length > 80 ? '...' : ''}&rdquo;
+                    </span>
+                    <span className="text-hacker-muted flex-shrink-0">
+                      {formatTimeAgo(build.created_at)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Live Conversation Feed */}
       {activeRoundtable && (

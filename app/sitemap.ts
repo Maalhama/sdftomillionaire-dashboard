@@ -50,7 +50,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const { data: prompts } = await supabase
       .from('user_prompts')
       .select('id, created_at')
-      .in('status', ['evaluated', 'winner', 'building'])
+      .in('status', ['evaluated', 'winner', 'building', 'completed', 'published'])
       .order('created_at', { ascending: false })
       .limit(200);
 

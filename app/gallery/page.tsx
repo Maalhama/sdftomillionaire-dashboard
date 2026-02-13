@@ -65,6 +65,8 @@ const statusConfig: Record<string, { label: string; badge: string }> = {
   evaluated: { label: 'VOTE OUVERT', badge: 'badge badge-live' },
   winner: { label: 'GAGNANT', badge: 'badge badge-live' },
   building: { label: 'EN CONSTRUCTION', badge: 'badge badge-amber' },
+  completed: { label: 'TERMINÉ', badge: 'badge badge-live' },
+  published: { label: 'PUBLIÉ', badge: 'badge badge-live' },
   closed: { label: 'CLOS', badge: 'badge badge-muted' },
 };
 
@@ -189,13 +191,13 @@ export default function GalleryPage() {
   const filtered = prompts.filter(p => {
     if (filter === 'evaluated') return p.status === 'evaluated';
     if (filter === 'pending') return p.status === 'pending' || p.status === 'evaluating';
-    if (filter === 'winners') return p.status === 'winner' || p.status === 'building';
+    if (filter === 'winners') return p.status === 'winner' || p.status === 'building' || p.status === 'completed' || p.status === 'published';
     return true;
   });
 
   const evaluatedCount = prompts.filter(p => p.status === 'evaluated').length;
   const pendingCount = prompts.filter(p => p.status === 'pending' || p.status === 'evaluating').length;
-  const winnersCount = prompts.filter(p => p.status === 'winner' || p.status === 'building').length;
+  const winnersCount = prompts.filter(p => p.status === 'winner' || p.status === 'building' || p.status === 'completed' || p.status === 'published').length;
 
   const filters = [
     { value: 'all' as const, label: `all (${prompts.length})` },
@@ -332,7 +334,7 @@ export default function GalleryPage() {
 
                       <div className="flex items-center gap-3 shrink-0">
                         {(() => {
-                          const isWinner = prompt.status === 'winner' || prompt.status === 'building';
+                          const isWinner = prompt.status === 'winner' || prompt.status === 'building' || prompt.status === 'completed' || prompt.status === 'published';
                           const isClosed = prompt.status === 'closed';
                           const deadlinePassed = prompt.voting_deadline ? new Date(prompt.voting_deadline) <= new Date() : false;
                           const hasVoted = votedIds.has(prompt.id);
@@ -345,6 +347,7 @@ export default function GalleryPage() {
                                 <div className="flex items-center gap-1.5 text-hacker-amber">
                                   <Shield className="w-5 h-5" />
                                   {prompt.status === 'building' && <Wrench className="w-4 h-4 animate-pulse" />}
+                                  {(prompt.status === 'completed' || prompt.status === 'published') && <CheckCircle className="w-4 h-4 text-hacker-green" />}
                                 </div>
                                 <span className="text-sm font-mono font-bold text-hacker-amber">{prompt.votes_count}</span>
                               </div>
