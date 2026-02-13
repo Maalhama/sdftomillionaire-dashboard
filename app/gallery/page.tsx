@@ -209,7 +209,7 @@ export default function GalleryPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8">
         <p className="text-hacker-green text-sm mb-2 font-mono">// toutes les idées soumises</p>
         <div className="flex items-center gap-4 mb-4">
-          <h1 className="text-3xl md:text-4xl font-bold text-white">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">
             Galerie des Idées
           </h1>
           <span className="badge badge-live">live</span>
@@ -223,22 +223,22 @@ export default function GalleryPage() {
       {/* STATS */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
         <div className="card p-6">
-          <div className="grid grid-cols-4 gap-6 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 text-center">
             <div>
-              <div className="text-3xl font-bold text-hacker-green">{prompts.length}</div>
-              <div className="text-sm text-hacker-muted-light">Idées soumises</div>
+              <div className="text-2xl sm:text-3xl font-bold text-hacker-green">{prompts.length}</div>
+              <div className="text-xs sm:text-sm text-hacker-muted-light">Idées soumises</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-hacker-cyan">{evaluatedCount}</div>
-              <div className="text-sm text-hacker-muted-light">Votes ouverts</div>
+              <div className="text-2xl sm:text-3xl font-bold text-hacker-cyan">{evaluatedCount}</div>
+              <div className="text-xs sm:text-sm text-hacker-muted-light">Votes ouverts</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-hacker-amber">{winnersCount}</div>
-              <div className="text-sm text-hacker-muted-light">Gagnants</div>
+              <div className="text-2xl sm:text-3xl font-bold text-hacker-amber">{winnersCount}</div>
+              <div className="text-xs sm:text-sm text-hacker-muted-light">Gagnants</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-hacker-muted-light">{pendingCount}</div>
-              <div className="text-sm text-hacker-muted-light">En attente</div>
+              <div className="text-2xl sm:text-3xl font-bold text-hacker-muted-light">{pendingCount}</div>
+              <div className="text-xs sm:text-sm text-hacker-muted-light">En attente</div>
             </div>
           </div>
         </div>
@@ -246,13 +246,13 @@ export default function GalleryPage() {
 
       {/* FILTERS */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
-        <div className="flex items-center gap-1 font-mono text-sm">
+        <div className="flex flex-wrap items-center gap-1 font-mono text-xs sm:text-sm">
           <span className="text-hacker-green mr-2">$ filter --status=</span>
           {filters.map((f) => (
             <button
               key={f.value}
               onClick={() => setFilter(f.value)}
-              className={`px-3 py-1.5 rounded text-sm transition-all ${
+              className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-xs sm:text-sm transition-all ${
                 filter === f.value
                   ? 'bg-hacker-green/10 text-hacker-green border border-hacker-green/30'
                   : 'text-hacker-muted-light border border-transparent hover:text-hacker-text hover:border-hacker-border'
@@ -392,7 +392,7 @@ export default function GalleryPage() {
                       <div className="p-5 space-y-4">
                         <p className="text-hacker-text text-sm leading-relaxed">{plan.summary}</p>
 
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
                           <div className="flex items-center gap-2 text-xs font-mono">
                             <CircuitBoard className="w-3.5 h-3.5 text-hacker-green" />
                             <div>

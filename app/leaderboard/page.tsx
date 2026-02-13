@@ -90,7 +90,7 @@ export default function LeaderboardPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8">
         <p className="text-hacker-green text-sm mb-2 font-mono">// les plus actifs de la communauté</p>
         <div className="flex items-center gap-4 mb-4">
-          <h1 className="text-3xl md:text-4xl font-bold text-white">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">
             Top Contributeurs
           </h1>
           <Hash className="w-8 h-8 text-hacker-amber" />
@@ -102,7 +102,7 @@ export default function LeaderboardPage() {
 
       {/* TABS */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
-        <div className="flex items-center gap-1 font-mono text-sm">
+        <div className="flex flex-wrap items-center gap-1 font-mono text-xs sm:text-sm">
           <span className="text-hacker-green mr-2">$ sort --by=</span>
           {TABS.map((t) => {
             const Icon = t.icon;
@@ -110,7 +110,7 @@ export default function LeaderboardPage() {
               <button
                 key={t.value}
                 onClick={() => setTab(t.value)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-all ${
+                className={`flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded text-xs sm:text-sm transition-all ${
                   tab === t.value
                     ? 'bg-hacker-green/10 text-hacker-green border border-hacker-green/30'
                     : 'text-hacker-muted-light border border-transparent hover:text-hacker-text hover:border-hacker-border'
@@ -145,13 +145,19 @@ export default function LeaderboardPage() {
         ) : (
           <div className="card overflow-hidden">
             {/* Header */}
-            <div className="grid grid-cols-[40px_1fr_80px_80px_80px_80px] gap-2 px-4 py-3 border-b border-hacker-border text-[11px] text-hacker-muted uppercase tracking-wider font-mono">
+            {/* Desktop Header */}
+            <div className="hidden sm:grid grid-cols-[40px_1fr_80px_80px_80px_80px] gap-2 px-4 py-3 border-b border-hacker-border text-[11px] text-hacker-muted uppercase tracking-wider font-mono">
               <div>#</div>
               <div>Contributeur</div>
               <div className="text-right">Idées</div>
               <div className="text-right">Votes</div>
               <div className="text-right">DL</div>
               <div className="text-right">Score</div>
+            </div>
+            {/* Mobile Header */}
+            <div className="sm:hidden flex items-center justify-between px-4 py-3 border-b border-hacker-border text-[11px] text-hacker-muted uppercase tracking-wider font-mono">
+              <div># Contributeur</div>
+              <div>Score</div>
             </div>
 
             {/* Rows */}
@@ -162,12 +168,36 @@ export default function LeaderboardPage() {
               return (
                 <div
                   key={entry.id}
-                  className={`grid grid-cols-[40px_1fr_80px_80px_80px_80px] gap-2 px-4 py-3 items-center transition-colors ${
+                  className={`transition-colors ${
                     isTop3
                       ? 'bg-hacker-green/5 border-b border-hacker-border'
                       : 'border-b border-hacker-border/50 hover:bg-hacker-card-hover'
                   }`}
                 >
+                  {/* Mobile */}
+                  <div className="flex sm:hidden items-center justify-between px-4 py-3 gap-3">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="shrink-0">{getRankIcon(rank)}</div>
+                      {entry.avatar_url ? (
+                        <img src={entry.avatar_url} alt="" className="w-6 h-6 rounded-full border border-hacker-border shrink-0" />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-hacker-green/10 border border-hacker-green/20 flex items-center justify-center shrink-0">
+                          <span className="text-[10px] text-hacker-green font-bold">
+                            {getDisplayName(entry)[0]?.toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                      <span className={`text-sm font-mono truncate ${isTop3 ? 'text-white font-bold' : 'text-hacker-text'}`}>
+                        {getDisplayName(entry)}
+                      </span>
+                    </div>
+                    <div className={`text-sm font-mono font-bold shrink-0 ${isTop3 ? 'text-hacker-green' : 'text-hacker-muted-light'}`}>
+                      {getScore(entry)}
+                    </div>
+                  </div>
+
+                  {/* Desktop */}
+                  <div className="hidden sm:grid grid-cols-[40px_1fr_80px_80px_80px_80px] gap-2 px-4 py-3 items-center">
                   <div className="flex items-center justify-center">
                     {getRankIcon(rank)}
                   </div>
@@ -198,6 +228,7 @@ export default function LeaderboardPage() {
                   </div>
                   <div className={`text-right text-sm font-mono font-bold ${isTop3 ? 'text-hacker-green' : 'text-hacker-muted-light'}`}>
                     {getScore(entry)}
+                  </div>
                   </div>
                 </div>
               );

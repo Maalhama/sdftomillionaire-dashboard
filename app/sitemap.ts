@@ -14,7 +14,31 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/insights`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.5 },
     { url: `${SITE_URL}/pricing`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
     { url: `${SITE_URL}/leaderboard`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.6 },
+    { url: `${SITE_URL}/conversations`, lastModified: new Date(), changeFrequency: 'hourly', priority: 0.5 },
+    { url: `${SITE_URL}/memories`, lastModified: new Date(), changeFrequency: 'hourly', priority: 0.5 },
   ];
+
+  // Insight articles (static slugs)
+  const insightSlugs = [
+    'architecting-ai-personalities-rpg-framework',
+    'building-multi-agent-system-document-processing',
+    'agent-work-logs-beat-polish-trust',
+    'agents-need-artifact-handoffs-not-chat-reports',
+    'agent-operations-transparency-capability-debt',
+    '24-hours-autonomous-sdftomillionaire-operations-learnings',
+    'building-ai-agents-public-documentation-journey',
+    'lessons-from-six-months-ai-agents-production',
+    'ai-agents-handoff-protocols-vs-shared-memory',
+    'solo-builders-reclaim-time-lost-admin-work',
+    'ai-agent-architecture-patterns-production',
+    'polymarket-golden-strategy-v5-deployment',
+  ];
+  const insightRoutes: MetadataRoute.Sitemap = insightSlugs.map((slug) => ({
+    url: `${SITE_URL}/insights/${slug}`,
+    lastModified: new Date('2026-02-11'),
+    changeFrequency: 'monthly' as const,
+    priority: 0.6,
+  }));
 
   // Dynamic prompt pages
   let promptRoutes: MetadataRoute.Sitemap = [];
@@ -42,5 +66,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Graceful fallback: static routes only
   }
 
-  return [...staticRoutes, ...promptRoutes];
+  return [...staticRoutes, ...insightRoutes, ...promptRoutes];
 }

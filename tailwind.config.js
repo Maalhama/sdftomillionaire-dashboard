@@ -47,6 +47,8 @@ module.exports = {
         'matrix-rain': 'matrix-rain 2s linear infinite',
         'counter': 'counter 0.3s ease-out',
         'border-glow': 'border-glow 3s ease-in-out infinite',
+        'marquee': 'marquee 15s linear infinite',
+        'marquee-slow': 'marquee 20s linear infinite',
       },
       keyframes: {
         'glow-pulse': {
@@ -85,6 +87,10 @@ module.exports = {
         'border-glow': {
           '0%, 100%': { borderColor: '#1a1f26' },
           '50%': { borderColor: '#00ff4133' },
+        },
+        'marquee': {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
         },
       },
     },

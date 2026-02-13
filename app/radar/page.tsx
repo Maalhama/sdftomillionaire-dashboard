@@ -250,7 +250,7 @@ export default function RadarPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8">
         <p className="text-hacker-green text-sm mb-2 font-mono">// où en sont vos idées ?</p>
         <div className="flex items-center gap-4 mb-4">
-          <h1 className="text-3xl md:text-4xl font-bold text-white">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">
             Suivi des Idées
           </h1>
           <span className="badge badge-live">live</span>
@@ -266,11 +266,11 @@ export default function RadarPage() {
       {/* ═══ PIPELINE STATS ═══ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10">
         <div className="card p-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 mb-8">
             {pipelineStats.map((stat, i) => (
               <div key={i} className="text-center">
                 <stat.icon className={`w-5 h-5 mx-auto mb-2 ${statColors[i]}`} />
-                <div className={`text-3xl font-bold ${statColors[i]}`}>{stat.count}</div>
+                <div className={`text-2xl sm:text-3xl font-bold ${statColors[i]}`}>{stat.count}</div>
                 <div className="text-sm text-hacker-text font-medium mt-1">{stat.label}</div>
                 <div className="text-xs text-hacker-muted">{stat.sub}</div>
               </div>
@@ -278,7 +278,7 @@ export default function RadarPage() {
           </div>
 
           {/* ASCII Pipeline */}
-          <div className="text-center font-mono text-sm py-4 border-t border-hacker-border overflow-x-auto whitespace-nowrap">
+          <div className="text-center font-mono text-xs sm:text-sm py-4 border-t border-hacker-border overflow-x-auto whitespace-nowrap">
             <span className="text-hacker-muted-light">[</span>
             <span className="text-hacker-muted-light">PENDING</span>
             <span className="text-hacker-muted-light">]</span>
@@ -312,7 +312,7 @@ export default function RadarPage() {
           <span className="text-sm text-hacker-muted-light">{successStories.length} déployés</span>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-3 gap-3 sm:gap-4">
           {successStories.map((story, i) => (
             <div key={i} className="card-terminal p-5">
               <div className="flex items-center justify-between mb-3">
@@ -335,13 +335,13 @@ export default function RadarPage() {
 
       {/* ═══ FILTER TABS ═══ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
-        <div className="flex items-center gap-1 font-mono text-sm">
+        <div className="flex flex-wrap items-center gap-1 font-mono text-xs sm:text-sm">
           <span className="text-hacker-green mr-2">$ filter --status=</span>
           {filters.map((f) => (
             <button
               key={f.value}
               onClick={() => setFilter(f.value)}
-              className={`px-3 py-1.5 rounded text-sm transition-all ${
+              className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-xs sm:text-sm transition-all ${
                 filter === f.value
                   ? 'bg-hacker-green/10 text-hacker-green border border-hacker-green/30'
                   : 'text-hacker-muted-light border border-transparent hover:text-hacker-text hover:border-hacker-border'
@@ -375,7 +375,7 @@ export default function RadarPage() {
             <p className="text-hacker-muted font-mono text-sm">// aucune idée dans ce filtre</p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {filteredIdeas.map((idea) => {
               const radarStatus = getRadarStatus(idea.status, idea.ai_plan?.verdict);
               const progress = getProgress(idea.status, idea.ai_plan?.feasibility_score);

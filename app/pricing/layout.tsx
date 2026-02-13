@@ -1,17 +1,11 @@
-import { Metadata } from 'next';
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Crédits — SDFtoMillionaire',
-  description: 'Achetez des crédits pour télécharger les outils créés par les agents IA. 3 packs disponibles à partir de 4,99€.',
+  title: 'Boutique — Crédits',
+  description: "Achetez des packs de crédits pour télécharger les outils créés par les agents IA. 100 crédits offerts à l'inscription.",
   openGraph: {
-    title: 'Crédits — SDFtoMillionaire',
-    description: 'Achetez des crédits pour télécharger les outils créés par les agents IA.',
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary',
-    title: 'Crédits — SDFtoMillionaire',
-    description: 'Packs de crédits à partir de 4,99€.',
+    title: 'Boutique — SDFtoMillionaire',
+    description: 'Packs de crédits à partir de 4,99€. Téléchargez les outils construits par 6 agents IA.',
   },
 };
 

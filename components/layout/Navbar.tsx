@@ -15,6 +15,7 @@ const navLinks = [
   { href: '/agents', label: 'agents', desc: 'les 6 IA autonomes' },
   { href: '/stage', label: 'QG', desc: 'salle 3D en direct' },
   { href: '/insights', label: 'blog', desc: 'articles et analyses' },
+  { href: '/accueil', label: 'FAQ', desc: 'questions fréquentes' },
 ];
 
 export default function Navbar() {
@@ -80,11 +81,13 @@ export default function Navbar() {
               <div className="w-8 h-8 rounded border border-hacker-green/30 flex items-center justify-center group-hover:border-hacker-green group-hover:shadow-[0_0_10px_rgba(0,255,65,0.3)] transition-all shrink-0">
                 <Terminal className="w-4 h-4 text-hacker-green" />
               </div>
-              <span className="hidden xs:inline text-sm font-medium text-hacker-green tracking-wider uppercase">
-                sdf<span className="text-hacker-text">to</span>m
-                <span className="hidden sm:inline">illionaire</span>
+              <span className="text-xs sm:text-sm font-medium text-hacker-green tracking-wider uppercase">
+                sdf<span className="text-hacker-text">to</span>millionaire
               </span>
-              <span className="badge badge-live text-[10px] hidden md:inline-flex">live</span>
+              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-mono uppercase tracking-widest border border-hacker-green/25 text-hacker-green/80 bg-hacker-green/5 leading-none">
+                <span className="w-1 h-1 rounded-full bg-hacker-green animate-pulse" />
+                live
+              </div>
             </Link>
 
             {/* Right side */}

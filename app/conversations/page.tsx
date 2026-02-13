@@ -130,7 +130,7 @@ export default function ConversationsPage() {
 
       {/* ═══ MAIN CONTENT ═══ */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
           
           {/* ── Conversation List ── */}
           <div className="lg:w-80 flex-shrink-0">

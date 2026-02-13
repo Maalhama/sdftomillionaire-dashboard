@@ -194,7 +194,7 @@ export default function ProfilePage() {
                     </button>
                   </div>
                   {profile?.bio && <p className="text-sm text-hacker-muted-light mb-2">{profile.bio}</p>}
-                  <div className="flex items-center gap-3 text-xs text-hacker-muted font-mono">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-hacker-muted font-mono">
                     <span>{user.email}</span>
                     {profile?.provider && <span className="badge badge-muted">{profile.provider}</span>}
                     <span className="flex items-center gap-1">
@@ -209,7 +209,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-8">
           <div className="card p-4 text-center">
             <Braces className="w-5 h-5 text-hacker-green mx-auto mb-2" />
             <div className="text-2xl font-bold text-white">{profile?.prompts_count || myPrompts.length}</div>
@@ -223,7 +223,7 @@ export default function ProfilePage() {
           <div className="card p-4 text-center">
             <Download className="w-5 h-5 text-hacker-amber mx-auto mb-2" />
             <div className="text-2xl font-bold text-white">{profile?.downloads_count || 0}</div>
-            <div className="text-xs text-hacker-muted font-mono">téléchargements</div>
+            <div className="text-[10px] sm:text-xs text-hacker-muted font-mono truncate">téléchargements</div>
           </div>
         </div>
 

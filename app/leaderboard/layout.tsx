@@ -1,17 +1,11 @@
-import { Metadata } from 'next';
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Classement — SDFtoMillionaire',
-  description: 'Top 50 des contributeurs de la communauté SDFtoMillionaire. Soumissions, votes et impact.',
+  title: 'Top Contributeurs',
+  description: 'Les 50 membres les plus actifs de la communauté SDFtoMillionaire. Soumettez des idées et votez pour monter.',
   openGraph: {
-    title: 'Classement — SDFtoMillionaire',
-    description: 'Top 50 des contributeurs de la communauté SDFtoMillionaire.',
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary',
-    title: 'Classement — SDFtoMillionaire',
-    description: 'Classement des contributeurs.',
+    title: 'Top Contributeurs — SDFtoMillionaire',
+    description: 'Classement des contributeurs les plus actifs. Idées soumises, votes et téléchargements.',
   },
 };
 
