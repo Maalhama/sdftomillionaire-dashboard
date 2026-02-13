@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/auth-context';
 import {
   ArrowLeft,
   Lightbulb,
@@ -108,6 +109,7 @@ export default function GalleryPage() {
   const [filter, setFilter] = useState<'all' | 'evaluated' | 'pending' | 'winners'>('all');
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
   const [votingId, setVotingId] = useState<string | null>(null);
+  const { session } = useAuth();
 
   // Charger les votes depuis localStorage au mount
   useEffect(() => {
@@ -123,7 +125,11 @@ export default function GalleryPage() {
 
     setVotingId(promptId);
     try {
-      const res = await fetch(`/api/prompts/${promptId}/vote`, { method: 'POST' });
+      const headers: Record<string, string> = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      const res = await fetch(`/api/prompts/${promptId}/vote`, { method: 'POST', headers });
       const data = await res.json();
 
       if (res.ok) {

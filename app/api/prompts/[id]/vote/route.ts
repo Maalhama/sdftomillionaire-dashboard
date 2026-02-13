@@ -33,7 +33,7 @@ export async function POST(
 
     if (prompt.status !== 'evaluated') {
       return NextResponse.json(
-        { error: 'Ce prompt n\'est pas encore évalué.' },
+        { error: 'Ce prompt n\'est pas ouvert au vote.' },
         { status: 400 }
       );
     }
@@ -45,20 +45,46 @@ export async function POST(
       );
     }
 
-    // Hash IP (même logique que app/api/prompts/route.ts)
+    // Extraire user_id depuis le token auth (optionnel)
+    let userId: string | null = null;
+    const authHeader = request.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice(7);
+      const { data: { user } } = await supabase.auth.getUser(token);
+      userId = user?.id ?? null;
+    }
+
+    // Hash IP (fallback pour les anonymes)
     const forwarded = request.headers.get('x-forwarded-for');
     const ip = forwarded?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
     const ipHash = createHash('sha256').update(ip).digest('hex');
 
-    // Vérifier doublon
-    const { data: existingVote } = await supabase
+    // Vérifier doublon par user_id (si connecté)
+    if (userId) {
+      const { data: existingUserVote } = await supabase
+        .from('user_votes')
+        .select('id')
+        .eq('prompt_id', id)
+        .eq('user_id', userId)
+        .single();
+
+      if (existingUserVote) {
+        return NextResponse.json(
+          { error: 'Tu as déjà voté pour cette idée.' },
+          { status: 409 }
+        );
+      }
+    }
+
+    // Vérifier doublon par IP (toujours, même connecté)
+    const { data: existingIpVote } = await supabase
       .from('user_votes')
       .select('id')
       .eq('prompt_id', id)
       .eq('ip_hash', ipHash)
       .single();
 
-    if (existingVote) {
+    if (existingIpVote) {
       return NextResponse.json(
         { error: 'Tu as déjà voté pour cette idée.' },
         { status: 409 }
@@ -68,7 +94,11 @@ export async function POST(
     // Insérer le vote
     const { error: insertError } = await supabase
       .from('user_votes')
-      .insert({ prompt_id: id, ip_hash: ipHash });
+      .insert({
+        prompt_id: id,
+        ip_hash: ipHash,
+        user_id: userId,
+      });
 
     if (insertError) {
       // Contrainte UNIQUE violée (race condition)
@@ -85,7 +115,7 @@ export async function POST(
       );
     }
 
-    // Incrémenter le compteur
+    // Incrémenter le compteur prompt
     const { error: updateError } = await supabase
       .from('user_prompts')
       .update({ votes_count: (prompt.votes_count || 0) + 1 })
@@ -97,6 +127,22 @@ export async function POST(
         { error: 'Erreur lors de la mise à jour du compteur.' },
         { status: 500 }
       );
+    }
+
+    // Incrémenter le compteur profil si connecté
+    if (userId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('votes_count')
+        .eq('id', userId)
+        .single();
+
+      if (profile) {
+        await supabase
+          .from('profiles')
+          .update({ votes_count: (profile.votes_count || 0) + 1 })
+          .eq('id', userId);
+      }
     }
 
     return NextResponse.json({
