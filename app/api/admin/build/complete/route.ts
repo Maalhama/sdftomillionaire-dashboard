@@ -26,7 +26,10 @@ function getSupabase() {
 export async function POST(request: NextRequest) {
   // Auth check
   const adminSecret = request.headers.get('x-admin-secret');
-  if (!adminSecret || adminSecret !== process.env.ADMIN_SECRET) {
+  const envSecret = process.env.ADMIN_SECRET;
+
+  if (!adminSecret || !envSecret || adminSecret !== envSecret) {
+    console.error(`[admin-auth] header="${adminSecret ? 'present' : 'missing'}" env="${envSecret ? 'present' : 'missing'}" match=${adminSecret === envSecret}`);
     return NextResponse.json(
       { error: 'Non autorisé.' },
       { status: 401 }
