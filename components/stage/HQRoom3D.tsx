@@ -1582,136 +1582,18 @@ interface ActiveBubble {
   createdAt: number;
 }
 
-// Single Habbo-style bubble rendered above an agent's seat position
-// It floats upward continuously and fades out
-function HabboBubbleFloat({ bubble }: { bubble: ActiveBubble }) {
-  const startY = bubble.seatPos[1] + 2.8;
-  const [offset, setOffset] = useState(0);
-  const [opacity, setOpacity] = useState(0);
-  const mountTime = useRef(Date.now());
-
-  useEffect(() => {
-    // Fade in
-    requestAnimationFrame(() => setOpacity(1));
-  }, []);
-
-  // Continuously float upward
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const age = (Date.now() - mountTime.current) / 1000;
-      setOffset(age * 8); // 8px per second upward
-      // Fade out in last 3s of 10s life
-      if (age > 7) {
-        setOpacity(Math.max(0, 1 - (age - 7) / 3));
-      }
-    }, 50);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <Html
-      position={[bubble.seatPos[0], startY, bubble.seatPos[2]]}
-      center
-      style={{ pointerEvents: 'none' }}
-    >
-      <div
-        className="select-none"
-        style={{
-          transform: `translateY(${-offset}px)`,
-          opacity,
-          transition: 'opacity 0.4s ease',
-        }}
-      >
-        {/* Habbo-style wide bubble */}
-        <div
-          style={{
-            background: '#fffef5',
-            border: `2px solid ${bubble.color}`,
-            borderRadius: '14px',
-            padding: '5px 10px',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '8px',
-            boxShadow: `2px 3px 0px rgba(0, 0, 0, 0.15), 0 0 8px ${bubble.color}33`,
-            minWidth: '200px',
-            maxWidth: '400px',
-            position: 'relative',
-            animation: 'habboPopIn 0.25s ease-out',
-          }}
-        >
-          {/* Avatar circle */}
-          <div
-            style={{
-              width: '18px',
-              height: '18px',
-              minWidth: '18px',
-              borderRadius: '50%',
-              background: bubble.color,
-              boxShadow: `0 0 6px ${bubble.color}88`,
-              marginTop: '1px',
-            }}
-          />
-          {/* Name + Text */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', flexWrap: 'wrap' }}>
-              <span
-                className="font-mono"
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 900,
-                  color: bubble.color,
-                  whiteSpace: 'nowrap',
-                  textShadow: `0 0 2px ${bubble.color}44`,
-                }}
-              >
-                {bubble.displayName}:
-              </span>
-              <span
-                className="font-sans"
-                style={{
-                  fontSize: '11px',
-                  lineHeight: 1.4,
-                  color: '#1a1a1a',
-                  wordBreak: 'break-word',
-                }}
-              >
-                {bubble.text}
-              </span>
-            </div>
-          </div>
-        </div>
-        {/* Speech pointer triangle — points down to the agent */}
-        <div
-          style={{
-            width: 0,
-            height: 0,
-            borderLeft: '6px solid transparent',
-            borderRight: '6px solid transparent',
-            borderTop: `8px solid ${bubble.color}`,
-            margin: '0 auto',
-            filter: 'drop-shadow(1px 1px 0 rgba(0,0,0,0.1))',
-          }}
-        />
-      </div>
-      <style>{`
-        @keyframes habboPopIn {
-          0% { opacity: 0; transform: scale(0.8) translateY(10px); }
-          100% { opacity: 1; transform: scale(1) translateY(0); }
-        }
-      `}</style>
-    </Html>
-  );
-}
-
-// Controller that queues messages and shows them one-by-one above the speaking agent
+// ── Habbo-style flat chat bar above speaking agent ──
+// Wide horizontal bar, avatar + name + text on one line (2 lines max if long)
+// Floats upward slowly, no overlap — each new message waits for the previous one
 function HabboChatController({ conversationLog, isDiscussing }: { conversationLog?: ConversationTurn[]; isDiscussing: boolean }) {
-  const [activeBubbles, setActiveBubbles] = useState<ActiveBubble[]>([]);
+  const [visibleMessages, setVisibleMessages] = useState<(ActiveBubble & { offsetY: number; zOrder: number; opacity: number })[]>([]);
   const lastProcessedTurn = useRef(-1);
   const queueRef = useRef<ActiveBubble[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const discussionStartRef = useRef<number>(0);
+  const messageCounter = useRef(0);
 
-  // Track discussion start time
+  // Track discussion start
   useEffect(() => {
     if (isDiscussing && discussionStartRef.current === 0) {
       discussionStartRef.current = Date.now();
@@ -1721,7 +1603,7 @@ function HabboChatController({ conversationLog, isDiscussing }: { conversationLo
     }
   }, [isDiscussing]);
 
-  // Show next bubble from queue
+  // Show next message — only one active at a time above the speaking agent
   const showNext = useCallback(() => {
     if (queueRef.current.length === 0) {
       timerRef.current = null;
@@ -1729,13 +1611,19 @@ function HabboChatController({ conversationLog, isDiscussing }: { conversationLo
     }
     const next = queueRef.current.shift()!;
     next.createdAt = Date.now();
-    setActiveBubbles(prev => [...prev, next]);
+    messageCounter.current += 1;
+    const zOrder = messageCounter.current;
 
-    // Next message after 4s (enough time to read + bubble starts floating)
-    timerRef.current = setTimeout(showNext, 4000);
+    setVisibleMessages(prev => [
+      ...prev,
+      { ...next, offsetY: 0, zOrder, opacity: 1 },
+    ]);
+
+    // Next message after 5s — enough for current one to rise and make room
+    timerRef.current = setTimeout(showNext, 5000);
   }, []);
 
-  // Queue new turns from conversation_log
+  // Queue new turns
   useEffect(() => {
     if (!conversationLog || conversationLog.length === 0) return;
 
@@ -1757,7 +1645,6 @@ function HabboChatController({ conversationLog, isDiscussing }: { conversationLo
       });
     }
 
-    // Start drain if idle
     if (!timerRef.current) {
       const elapsed = Date.now() - discussionStartRef.current;
       const walkDelay = Math.max(0, 10000 - elapsed);
@@ -1765,21 +1652,33 @@ function HabboChatController({ conversationLog, isDiscussing }: { conversationLo
     }
   }, [conversationLog, showNext]);
 
-  // Remove bubbles after 10s
+  // Animate: float up + fade out older messages
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
-      setActiveBubbles(prev => prev.filter(b => now - b.createdAt < 10000));
-    }, 1000);
+      setVisibleMessages(prev => {
+        const updated = prev.map(m => {
+          const age = (now - m.createdAt) / 1000;
+          return {
+            ...m,
+            offsetY: age * 6, // 6px/s upward
+            opacity: age > 8 ? Math.max(0, 1 - (age - 8) / 2) : 1,
+          };
+        });
+        // Remove fully faded messages (>10s old)
+        return updated.filter(m => (now - m.createdAt) < 10000);
+      });
+    }, 60);
     return () => clearInterval(interval);
   }, []);
 
-  // Reset on discussion end
+  // Reset
   useEffect(() => {
     if (!isDiscussing) {
-      setActiveBubbles([]);
+      setVisibleMessages([]);
       queueRef.current = [];
       lastProcessedTurn.current = -1;
+      messageCounter.current = 0;
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
@@ -1789,8 +1688,91 @@ function HabboChatController({ conversationLog, isDiscussing }: { conversationLo
 
   return (
     <>
-      {activeBubbles.map(bubble => (
-        <HabboBubbleFloat key={`habbo-${bubble.id}`} bubble={bubble} />
+      {visibleMessages.map(msg => (
+        <Html
+          key={`habbo-${msg.id}`}
+          position={[msg.seatPos[0], msg.seatPos[1] + 2.8, msg.seatPos[2]]}
+          center
+          zIndexRange={[msg.zOrder + 100, msg.zOrder + 100]}
+          style={{ pointerEvents: 'none' }}
+        >
+          <div
+            className="select-none"
+            style={{
+              transform: `translateY(${-msg.offsetY}px)`,
+              opacity: msg.opacity,
+              zIndex: msg.zOrder,
+            }}
+          >
+            {/* Habbo flat chat bar — wide, dark, rectangular */}
+            <div
+              style={{
+                background: 'rgba(17, 17, 17, 0.88)',
+                borderRadius: '4px',
+                padding: '4px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                width: '480px',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.5)',
+                borderLeft: `3px solid ${msg.color}`,
+              }}
+            >
+              {/* Avatar circle */}
+              <div
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  minWidth: '20px',
+                  borderRadius: '50%',
+                  background: msg.color,
+                  boxShadow: `0 0 4px ${msg.color}`,
+                }}
+              />
+              {/* Name + message inline */}
+              <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                <span
+                  className="font-mono"
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    color: msg.color,
+                    whiteSpace: 'nowrap',
+                    marginRight: '6px',
+                  }}
+                >
+                  {msg.displayName}:
+                </span>
+                <span
+                  className="font-sans"
+                  style={{
+                    fontSize: '12px',
+                    lineHeight: 1.4,
+                    color: '#e5e5e5',
+                    wordBreak: 'break-word',
+                    display: '-webkit-inline-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {msg.text}
+                </span>
+              </div>
+            </div>
+            {/* Small triangle pointer down to agent */}
+            <div
+              style={{
+                width: 0,
+                height: 0,
+                borderLeft: '5px solid transparent',
+                borderRight: '5px solid transparent',
+                borderTop: '6px solid rgba(17, 17, 17, 0.88)',
+                marginLeft: '24px',
+              }}
+            />
+          </div>
+        </Html>
       ))}
     </>
   );
