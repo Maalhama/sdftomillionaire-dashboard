@@ -180,8 +180,9 @@ const ROAM_WAYPOINTS: [number, number, number][] = [
   [-11, 0,  2.5],   // left wall corridor
   [-6.5, 0, -7.5],  // behind island 1
   [-6.5, 0,  7.5],  // behind island 3
-  // ── Doorway area ──
-  [1.5, 0,  0],     // in the door
+  // ── Doorway approaches (NOT inside the passage) ──
+  [-0.5, 0,  0],    // workspace side of door
+  [3.5, 0,  0],     // conference side of door
   // ── Conference room ──
   [3.5, 0, -6],     // conference top-left
   [3.5, 0,  6],     // conference bottom-left

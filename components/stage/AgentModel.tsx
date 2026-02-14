@@ -55,12 +55,15 @@ function planPath(
 
   if (fromSide === toSide) return [to.clone()];
 
-  const doorCenterZ = (div.doorZMin + div.doorZMax) / 2;
+  // Use agent's current Z to pick a natural crossing point within the door
+  // Clamp to door bounds with padding so agents spread across the full opening
+  const doorPad = 0.6;
+  const clampedZ = Math.max(div.doorZMin + doorPad, Math.min(div.doorZMax - doorPad, from.z));
   const approachOffset = 0.8;
 
   return [
-    new THREE.Vector3(div.x + fromSide * approachOffset, 0, doorCenterZ),
-    new THREE.Vector3(div.x + toSide * approachOffset, 0, doorCenterZ),
+    new THREE.Vector3(div.x + fromSide * approachOffset, 0, clampedZ),
+    new THREE.Vector3(div.x + toSide * approachOffset, 0, clampedZ),
     to.clone(),
   ];
 }
