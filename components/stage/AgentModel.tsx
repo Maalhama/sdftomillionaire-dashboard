@@ -128,6 +128,9 @@ export default function AgentModel({
     smoothAvoidZ: 0,
     prevFrameX: position[0],
     prevFrameZ: position[2],
+    // Rendered position (includes steering offset — the true visual position)
+    renderedX: position[0],
+    renderedZ: position[2],
     // Remember what state to go to after entire path completes
     postPathState: null as InternalState | null,
   });
@@ -146,12 +149,13 @@ export default function AgentModel({
     walkState: InternalState,
     postState: InternalState | null,
   ) => {
+    // Use the actual rendered position as the start (avoids teleport from steering offset)
+    b.currentPos.set(b.renderedX, 0, b.renderedZ);
     const path = planPath(b.currentPos, finalTarget, collisionData);
     b.path = path;
     b.pathIndex = 0;
     b.postPathState = postState;
-    b.smoothAvoidX = 0;
-    b.smoothAvoidZ = 0;
+    // Do NOT reset smoothAvoid — let it decay naturally via lerp
 
     // Set up first segment
     const firstTarget = path[0];
@@ -275,7 +279,8 @@ export default function AgentModel({
 
     // ── Segment completion + path advancement ──
     if (b.stateTimer >= b.stateDuration && isWalking) {
-      b.currentPos.copy(b.targetPos);
+      // Use rendered position (not target) to avoid snap teleport
+      b.currentPos.set(b.renderedX, 0, b.renderedZ);
 
       // More segments in the path?
       if (b.pathIndex < b.path.length - 1) {
@@ -290,7 +295,6 @@ export default function AgentModel({
         // Path complete — transition to post-path state
         switch (b.internalState) {
           case 'walking-to-meeting': {
-            b.currentPos.copy(b.meetingSeat);
             b.internalState = 'meeting';
             b.stateTimer = 0;
             b.stateDuration = 999;
@@ -304,7 +308,7 @@ export default function AgentModel({
             break;
           }
           case 'returning-to-desk': {
-            b.currentPos.copy(b.homePos);
+            // Don't snap to homePos — let idle/working lerp from current rendered pos
             b.internalState = status === 'working' ? 'working' : 'idle';
             b.stateTimer = 0;
             b.stateDuration = 999;
@@ -339,8 +343,11 @@ export default function AgentModel({
 
     switch (b.internalState) {
       case 'idle': {
-        groupRef.current.position.x = b.homePos.x;
-        groupRef.current.position.z = b.homePos.z;
+        // Smoothly lerp to home position (prevents snap after returning-to-desk)
+        const idleX = THREE.MathUtils.lerp(b.renderedX, b.homePos.x, 0.08);
+        const idleZ = THREE.MathUtils.lerp(b.renderedZ, b.homePos.z, 0.08);
+        groupRef.current.position.x = idleX;
+        groupRef.current.position.z = idleZ;
         groupRef.current.position.y = Math.sin(t * 0.6 + b.bobPhase) * 0.003;
         groupRef.current.rotation.x = 0;
         b.targetRotY = rotation[1] * Math.PI / 180;
@@ -348,12 +355,21 @@ export default function AgentModel({
         groupRef.current.rotation.z = 0;
         const idleBreathe = 1 + Math.sin(t * 0.6 + b.bobPhase) * 0.002;
         groupRef.current.scale.set(scale * idleBreathe, scale * idleBreathe, scale * idleBreathe);
+        b.renderedX = idleX;
+        b.renderedZ = idleZ;
+        b.currentPos.set(idleX, 0, idleZ);
+        // Decay steering offset while stationary
+        b.smoothAvoidX *= 0.9;
+        b.smoothAvoidZ *= 0.9;
         break;
       }
 
       case 'working': {
-        groupRef.current.position.x = b.homePos.x;
-        groupRef.current.position.z = b.homePos.z;
+        // Smoothly lerp to home position
+        const workX = THREE.MathUtils.lerp(b.renderedX, b.homePos.x, 0.08);
+        const workZ = THREE.MathUtils.lerp(b.renderedZ, b.homePos.z, 0.08);
+        groupRef.current.position.x = workX;
+        groupRef.current.position.z = workZ;
         groupRef.current.position.y = Math.sin(t * 1.2 + b.bobPhase) * 0.008;
         groupRef.current.rotation.x = Math.sin(t * 0.8 + b.bobPhase) * 0.02;
         b.targetRotY = rotation[1] * Math.PI / 180;
@@ -361,6 +377,11 @@ export default function AgentModel({
         groupRef.current.rotation.z = Math.sin(t * 1.5 + b.bobPhase) * 0.01;
         const breathe = 1 + Math.sin(t * 1.2 + b.bobPhase) * 0.005;
         groupRef.current.scale.set(scale * breathe, scale * breathe, scale * breathe);
+        b.renderedX = workX;
+        b.renderedZ = workZ;
+        b.currentPos.set(workX, 0, workZ);
+        b.smoothAvoidX *= 0.9;
+        b.smoothAvoidZ *= 0.9;
         break;
       }
 
@@ -466,31 +487,33 @@ export default function AgentModel({
         px += b.smoothAvoidX;
         pz += b.smoothAvoidZ;
 
-        // 9. Safety clamp — room bounds + divider wall (rarely triggers)
+        // 9. Soft boundary forces (no hard clamps — everything is gradual)
         if (collisionData) {
-          // Divider wall hard clamp
+          // Divider wall — soft push instead of hard clamp
           const div = collisionData.divider;
           const inDoorZone = pz > div.doorZMin && pz < div.doorZMax;
           if (!inDoorZone) {
-            const wallPad = collisionData.agentRadius;
-            if (b.lastSideOfDivider < 0 && px > div.x - wallPad) {
-              px = div.x - wallPad;
-            } else if (b.lastSideOfDivider > 0 && px < div.x + wallPad) {
-              px = div.x + wallPad;
+            const wallPad = collisionData.agentRadius + 0.1;
+            if (b.lastSideOfDivider < 0) {
+              const penetration = px - (div.x - wallPad);
+              if (penetration > 0) px -= penetration * 0.3;
+            } else {
+              const penetration = (div.x + wallPad) - px;
+              if (penetration > 0) px += penetration * 0.3;
             }
           } else {
             if (px < div.x) b.lastSideOfDivider = -1;
             else b.lastSideOfDivider = 1;
           }
 
-          // Room bounds
+          // Room bounds — soft push
           const rb = collisionData.roomBounds;
-          if (px < rb.minX) px = rb.minX;
-          if (px > rb.maxX) px = rb.maxX;
-          if (pz < rb.minZ) pz = rb.minZ;
-          if (pz > rb.maxZ) pz = rb.maxZ;
+          if (px < rb.minX) px = THREE.MathUtils.lerp(px, rb.minX, 0.3);
+          if (px > rb.maxX) px = THREE.MathUtils.lerp(px, rb.maxX, 0.3);
+          if (pz < rb.minZ) pz = THREE.MathUtils.lerp(pz, rb.minZ, 0.3);
+          if (pz > rb.maxZ) pz = THREE.MathUtils.lerp(pz, rb.maxZ, 0.3);
 
-          // Hard obstacle clamp (safety net — should rarely fire with steering)
+          // Obstacle AABB — soft push outward (no snap)
           for (let i = 0; i < collisionData.obstacles.length; i++) {
             const ob = collisionData.obstacles[i];
             if (px > ob.minX && px < ob.maxX && pz > ob.minZ && pz < ob.maxZ) {
@@ -499,14 +522,15 @@ export default function AgentModel({
               const escapeTop = pz - ob.minZ;
               const escapeBottom = ob.maxZ - pz;
               const minEscape = Math.min(escapeLeft, escapeRight, escapeTop, escapeBottom);
-              if (minEscape === escapeLeft) px = ob.minX;
-              else if (minEscape === escapeRight) px = ob.maxX;
-              else if (minEscape === escapeTop) pz = ob.minZ;
-              else pz = ob.maxZ;
+              const pushRate = 0.4;
+              if (minEscape === escapeLeft) px -= escapeLeft * pushRate;
+              else if (minEscape === escapeRight) px += escapeRight * pushRate;
+              else if (minEscape === escapeTop) pz -= escapeTop * pushRate;
+              else pz += escapeBottom * pushRate;
             }
           }
 
-          // Hard meeting table clamp (safety)
+          // Meeting table circle — soft push (safety)
           if (b.internalState !== 'walking-to-meeting') {
             const mt = collisionData.meetingTable;
             const mtdx = px - mt.x;
@@ -514,10 +538,22 @@ export default function AgentModel({
             const mtdist = Math.sqrt(mtdx * mtdx + mtdz * mtdz);
             const mtMinDist = mt.radius + collisionData.agentRadius;
             if (mtdist < mtMinDist && mtdist > 0.001) {
-              px = mt.x + (mtdx / mtdist) * mtMinDist;
-              pz = mt.z + (mtdz / mtdist) * mtMinDist;
+              const pushAmount = (mtMinDist - mtdist) * 0.3;
+              px += (mtdx / mtdist) * pushAmount;
+              pz += (mtdz / mtdist) * pushAmount;
             }
           }
+        }
+
+        // 10. Per-frame movement cap — prevents teleportation from any source
+        const maxStep = 0.15; // max distance per frame (~9 units/sec at 60fps)
+        const moveX = px - b.renderedX;
+        const moveZ = pz - b.renderedZ;
+        const moveDist = Math.sqrt(moveX * moveX + moveZ * moveZ);
+        if (moveDist > maxStep) {
+          const clampRatio = maxStep / moveDist;
+          px = b.renderedX + moveX * clampRatio;
+          pz = b.renderedZ + moveZ * clampRatio;
         }
 
         groupRef.current.position.x = px;
@@ -525,7 +561,7 @@ export default function AgentModel({
         // Gentle walk bob (slow frequency, low amplitude)
         groupRef.current.position.y = Math.abs(Math.sin(t * 4)) * 0.015;
 
-        // 10. Rotation based on actual frame-to-frame movement direction
+        // 11. Rotation based on actual frame-to-frame movement direction
         const frameDx = px - b.prevFrameX;
         const frameDz = pz - b.prevFrameZ;
         if (Math.abs(frameDx) > 0.001 || Math.abs(frameDz) > 0.001) {
@@ -533,6 +569,8 @@ export default function AgentModel({
         }
         b.prevFrameX = px;
         b.prevFrameZ = pz;
+        b.renderedX = px;
+        b.renderedZ = pz;
 
         groupRef.current.rotation.y = b.currentRotY;
         // Subtle body sway while walking
@@ -544,8 +582,11 @@ export default function AgentModel({
       }
 
       case 'meeting': {
-        groupRef.current.position.x = b.meetingSeat.x;
-        groupRef.current.position.z = b.meetingSeat.z;
+        // Smoothly settle into seat (prevents snap from walking offset)
+        const mtX = THREE.MathUtils.lerp(b.renderedX, b.meetingSeat.x, 0.1);
+        const mtZ = THREE.MathUtils.lerp(b.renderedZ, b.meetingSeat.z, 0.1);
+        groupRef.current.position.x = mtX;
+        groupRef.current.position.z = mtZ;
         groupRef.current.position.y = Math.sin(t * 1.5 + b.bobPhase) * 0.01;
         const toDx = 3.5 - b.meetingSeat.x;
         const toDz = 0 - b.meetingSeat.z;
@@ -554,16 +595,18 @@ export default function AgentModel({
         groupRef.current.rotation.x = Math.sin(t * 2.5 + b.bobPhase) * 0.04;
         groupRef.current.rotation.z = Math.sin(t * 1.8 + b.bobPhase) * 0.02;
         groupRef.current.scale.set(scale, scale, scale);
+        b.renderedX = mtX;
+        b.renderedZ = mtZ;
+        b.currentPos.set(mtX, 0, mtZ);
+        b.smoothAvoidX *= 0.9;
+        b.smoothAvoidZ *= 0.9;
         break;
       }
 
       case 'pausing-at-waypoint': {
         // Agent is stationary — walkers steer around us via their own steering
-        const px = b.currentPos.x;
-        const pz = b.currentPos.z;
-
-        groupRef.current.position.x = px;
-        groupRef.current.position.z = pz;
+        groupRef.current.position.x = b.renderedX;
+        groupRef.current.position.z = b.renderedZ;
         groupRef.current.position.y = Math.sin(t * 0.8 + b.bobPhase) * 0.005;
         b.targetRotY += Math.sin(t * 0.5 + b.bobPhase) * 0.002;
         groupRef.current.rotation.y = b.currentRotY;
@@ -571,6 +614,9 @@ export default function AgentModel({
         groupRef.current.rotation.z = 0;
         const pauseBreathe = 1 + Math.sin(t * 0.9 + b.bobPhase) * 0.003;
         groupRef.current.scale.set(scale * pauseBreathe, scale * pauseBreathe, scale * pauseBreathe);
+        b.currentPos.set(b.renderedX, 0, b.renderedZ);
+        b.smoothAvoidX *= 0.9;
+        b.smoothAvoidZ *= 0.9;
         break;
       }
     }
