@@ -1714,11 +1714,18 @@ function HabboChatStack({ conversationLog, isDiscussing }: { conversationLog?: C
 const allDeskPositions = agentConfigs.map(c => c.position);
 
 function AgentStation({ config, configIndex, teleportToMeeting }: { config: typeof agentConfigs[0]; configIndex: number; teleportToMeeting: boolean }) {
-  // Poll the shared Float32Array via useFrame to trigger React re-renders on state changes
+  // Poll shared Float32Arrays via useFrame to track live agent position + internal state
   const [internalStateCode, setInternalStateCode] = useState(0);
+  const [livePos, setLivePos] = useState<[number, number, number]>(config.position);
   useFrame(() => {
     const code = SHARED_INTERNAL_STATES[configIndex];
     if (code !== internalStateCode) setInternalStateCode(code);
+
+    const lx = SHARED_POSITIONS[configIndex * 2];
+    const lz = SHARED_POSITIONS[configIndex * 2 + 1];
+    if (Math.abs(lx - livePos[0]) > 0.05 || Math.abs(lz - livePos[2]) > 0.05) {
+      setLivePos([lx, 0, lz]);
+    }
   });
 
   const isQuestReceived = internalStateCode === INTERNAL_STATE_CODES['quest-received'];
@@ -1760,12 +1767,12 @@ function AgentStation({ config, configIndex, teleportToMeeting }: { config: type
 
       <FloorRing position={config.position} color={config.color} />
 
-      {/* Idle → sleep bubble */}
+      {/* Idle → sleep bubble (at desk) */}
       {showSleepBubble && (
         <SleepBubble position={config.position} name={config.name} color={config.color} />
       )}
 
-      {/* Working → standard speech bubble at desk */}
+      {/* Working → standard speech bubble (at desk) */}
       {showWorkBubble && (
         <SpeechBubble
           name={config.name}
@@ -1776,9 +1783,9 @@ function AgentStation({ config, configIndex, teleportToMeeting }: { config: type
         />
       )}
 
-      {/* Quest received → "!" bubble at desk */}
+      {/* Quest received → "!" bubble follows agent live position */}
       {showQuestBubble && (
-        <QuestBubble position={config.position} name={config.name} color={config.color} />
+        <QuestBubble position={livePos} name={config.name} color={config.color} />
       )}
     </>
   );
