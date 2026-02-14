@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { Pause, Play, Monitor, CheckSquare, MessageCircle, Brain, Zap, MessageSquare, Rocket, Terminal, Activity, Eye, Search, PenTool, Megaphone, BarChart3, RefreshCw, Wrench, CheckCircle, Package } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -80,6 +80,8 @@ export default function StagePage() {
   const [loading, setLoading] = useState(true);
   const [activeRoundtable, setActiveRoundtable] = useState<Roundtable | null>(null);
   const [activeBuilds, setActiveBuilds] = useState<ActiveBuild[]>([]);
+  const [discussionCooldownUntil, setDiscussionCooldownUntil] = useState<number>(0);
+  const lastRoundtableStatusRef = useRef<string>('');
 
   const fetchData = useCallback(async () => {
     try {
@@ -145,6 +147,10 @@ export default function StagePage() {
   useEffect(() => {
     if (isPaused) return;
     const interval = setInterval(() => {
+      // Force re-render during discussion cooldown so agents stay at table
+      if (discussionCooldownUntil > Date.now()) {
+        setNow(new Date());
+      }
       setNextRefresh(prev => {
         if (prev <= 0) {
           fetchData();
@@ -155,7 +161,22 @@ export default function StagePage() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [isPaused, fetchData]);
+  }, [isPaused, fetchData, discussionCooldownUntil]);
+
+  // When roundtable finishes (running → succeeded/failed), keep agents at table for 40s cooldown
+  useEffect(() => {
+    const prevStatus = lastRoundtableStatusRef.current;
+    const curStatus = activeRoundtable?.status || '';
+    lastRoundtableStatusRef.current = curStatus;
+
+    if (
+      (prevStatus === 'running' || prevStatus === 'pending') &&
+      (curStatus === 'succeeded' || curStatus === 'failed')
+    ) {
+      // Cooldown: keep discussing status for 40s so chat bubbles have time to play
+      setDiscussionCooldownUntil(Date.now() + 40000);
+    }
+  }, [activeRoundtable?.status]);
 
   // Blinking cursor
   useEffect(() => {
@@ -176,6 +197,15 @@ export default function StagePage() {
       activeRoundtable &&
       (activeRoundtable.status === 'running' || activeRoundtable.status === 'pending') &&
       activeRoundtable.participants.includes(agentId)
+    ) {
+      return 'discussing';
+    }
+
+    // 1b. Cooldown after roundtable ends — keep agents at table for chat bubbles
+    if (
+      activeRoundtable &&
+      activeRoundtable.participants.includes(agentId) &&
+      Date.now() < discussionCooldownUntil
     ) {
       return 'discussing';
     }
