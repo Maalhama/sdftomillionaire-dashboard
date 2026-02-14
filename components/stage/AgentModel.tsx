@@ -30,6 +30,41 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
+// ── PATH PLANNING ──
+// Plans a multi-segment path from `from` to `to`, inserting door waypoints
+// when the agent needs to cross the divider wall.
+function planPath(
+  from: THREE.Vector3,
+  to: THREE.Vector3,
+  collisionData: CollisionData | undefined,
+): THREE.Vector3[] {
+  if (!collisionData) return [to.clone()];
+
+  const div = collisionData.divider;
+  const fromSide = from.x < div.x ? -1 : 1;
+  const toSide = to.x < div.x ? -1 : 1;
+
+  // Same side — direct path
+  if (fromSide === toSide) return [to.clone()];
+
+  // Different side — route through door
+  const doorCenterZ = (div.doorZMin + div.doorZMax) / 2; // 0
+  const approachOffset = 0.6;
+
+  const approachDoor = new THREE.Vector3(
+    div.x + fromSide * approachOffset,
+    0,
+    doorCenterZ,
+  );
+  const exitDoor = new THREE.Vector3(
+    div.x + toSide * approachOffset,
+    0,
+    doorCenterZ,
+  );
+
+  return [approachDoor, exitDoor, to.clone()];
+}
+
 interface AgentModelProps {
   modelPath: string;
   position: [number, number, number];
@@ -83,8 +118,18 @@ export default function AgentModel({
     shuffledWaypoints: shuffleArray(roamWaypoints),
     waypointIndex: 0,
     pauseDuration: 2 + Math.random() * 3,
-    // Track which side of divider we're on (for wall collision)
+    // Track which side of divider we're on
     lastSideOfDivider: position[0] < 0.3 ? -1 : 1,
+    // ── Path planning ──
+    path: [] as THREE.Vector3[],
+    pathIndex: 0,
+    // ── Smooth steering ──
+    smoothAvoidX: 0,
+    smoothAvoidZ: 0,
+    prevFrameX: position[0],
+    prevFrameZ: position[2],
+    // Remember what state to go to after entire path completes
+    postPathState: null as InternalState | null,
   });
 
   const b = behaviorRef.current;
@@ -95,13 +140,36 @@ export default function AgentModel({
     return Math.max(0.5, dist / walkSpeed);
   };
 
-  // Start walking to a specific target
-  const startWalkTo = (target: THREE.Vector3, nextState: InternalState) => {
+  // Start walking the first segment of a planned path
+  const startPathWalk = (
+    finalTarget: THREE.Vector3,
+    walkState: InternalState,
+    postState: InternalState | null,
+  ) => {
+    const path = planPath(b.currentPos, finalTarget, collisionData);
+    b.path = path;
+    b.pathIndex = 0;
+    b.postPathState = postState;
+    b.smoothAvoidX = 0;
+    b.smoothAvoidZ = 0;
+
+    // Set up first segment
+    const firstTarget = path[0];
     b.startPos.copy(b.currentPos);
-    b.targetPos.copy(target);
+    b.targetPos.copy(firstTarget);
     b.stateTimer = 0;
-    b.stateDuration = computeWalkDuration(b.currentPos, target);
-    b.internalState = nextState;
+    b.stateDuration = computeWalkDuration(b.currentPos, firstTarget);
+    b.internalState = walkState;
+  };
+
+  // Legacy wrapper for compatibility
+  const startWalkTo = (target: THREE.Vector3, nextState: InternalState) => {
+    // Determine post-path state based on walk type
+    let postState: InternalState | null = null;
+    if (nextState === 'walking-to-meeting') postState = 'meeting';
+    else if (nextState === 'walking-to-waypoint') postState = 'pausing-at-waypoint';
+    else if (nextState === 'returning-to-desk') postState = status === 'working' ? 'working' : 'idle';
+    startPathWalk(target, nextState, postState);
   };
 
   // Pick next roam waypoint
@@ -201,37 +269,60 @@ export default function AgentModel({
 
     b.stateTimer += delta;
 
-    // State transitions when timer expires
-    if (b.stateTimer >= b.stateDuration) {
+    const isWalking = b.internalState === 'walking-to-meeting'
+      || b.internalState === 'walking-to-waypoint'
+      || b.internalState === 'returning-to-desk';
+
+    // ── Segment completion + path advancement ──
+    if (b.stateTimer >= b.stateDuration && isWalking) {
+      b.currentPos.copy(b.targetPos);
+
+      // More segments in the path?
+      if (b.pathIndex < b.path.length - 1) {
+        b.pathIndex++;
+        const nextSeg = b.path[b.pathIndex];
+        b.startPos.copy(b.currentPos);
+        b.targetPos.copy(nextSeg);
+        b.stateTimer = 0;
+        b.stateDuration = computeWalkDuration(b.currentPos, nextSeg);
+        // Stay in current walking state
+      } else {
+        // Path complete — transition to post-path state
+        switch (b.internalState) {
+          case 'walking-to-meeting': {
+            b.currentPos.copy(b.meetingSeat);
+            b.internalState = 'meeting';
+            b.stateTimer = 0;
+            b.stateDuration = 999;
+            break;
+          }
+          case 'walking-to-waypoint': {
+            b.internalState = 'pausing-at-waypoint';
+            b.stateTimer = 0;
+            b.pauseDuration = 2 + Math.random() * 3;
+            b.stateDuration = b.pauseDuration;
+            break;
+          }
+          case 'returning-to-desk': {
+            b.currentPos.copy(b.homePos);
+            b.internalState = status === 'working' ? 'working' : 'idle';
+            b.stateTimer = 0;
+            b.stateDuration = 999;
+            break;
+          }
+        }
+      }
+    }
+
+    // Non-walking state transitions
+    if (b.stateTimer >= b.stateDuration && !isWalking) {
       switch (b.internalState) {
-        case 'walking-to-meeting': {
-          b.currentPos.copy(b.meetingSeat);
-          b.internalState = 'meeting';
-          b.stateTimer = 0;
-          b.stateDuration = 999;
-          break;
-        }
-        case 'walking-to-waypoint': {
-          b.currentPos.copy(b.targetPos);
-          b.internalState = 'pausing-at-waypoint';
-          b.stateTimer = 0;
-          b.pauseDuration = 2 + Math.random() * 3;
-          b.stateDuration = b.pauseDuration;
-          break;
-        }
         case 'pausing-at-waypoint': {
           if (status === 'roaming' && roamWaypoints.length > 0) {
             pickNextWaypoint();
           } else {
             startWalkTo(b.homePos, 'returning-to-desk');
           }
-          break;
-        }
-        case 'returning-to-desk': {
-          b.currentPos.copy(b.homePos);
-          b.internalState = status === 'working' ? 'working' : 'idle';
-          b.stateTimer = 0;
-          b.stateDuration = 999;
           break;
         }
         default:
@@ -246,12 +337,6 @@ export default function AgentModel({
 
     // Smooth rotation
     b.currentRotY = THREE.MathUtils.lerp(b.currentRotY, b.targetRotY, 0.05);
-
-    // Track if this is a mobile state (needs collision)
-    const isWalking = b.internalState === 'walking-to-meeting'
-      || b.internalState === 'walking-to-waypoint'
-      || b.internalState === 'returning-to-desk';
-    const isPausing = b.internalState === 'pausing-at-waypoint';
 
     switch (b.internalState) {
       case 'idle': {
@@ -283,31 +368,141 @@ export default function AgentModel({
       case 'walking-to-meeting':
       case 'walking-to-waypoint':
       case 'returning-to-desk': {
+        // 1. Base lerp position along current segment
         let px = THREE.MathUtils.lerp(b.startPos.x, b.targetPos.x, ease);
         let pz = THREE.MathUtils.lerp(b.startPos.z, b.targetPos.z, ease);
 
-        // ── COLLISION RESOLUTION ──
+        // 2. Compute walk direction (normalized)
+        const segDx = b.targetPos.x - b.startPos.x;
+        const segDz = b.targetPos.z - b.startPos.z;
+        const segLen = Math.sqrt(segDx * segDx + segDz * segDz);
+        const ndx = segLen > 0.01 ? segDx / segLen : 0;
+        const ndz = segLen > 0.01 ? segDz / segLen : 0;
+
+        // 3. Look-ahead point
+        const lookDist = 1.2;
+        const laX = px + ndx * lookDist;
+        const laZ = pz + ndz * lookDist;
+
+        // ── STEERING FORCES ──
+        let avoidX = 0;
+        let avoidZ = 0;
+
         if (collisionData && sharedPositions) {
-          // 1. Agent-agent separation
+          // 4. Obstacle avoidance (desks AABB)
+          for (let i = 0; i < collisionData.obstacles.length; i++) {
+            const ob = collisionData.obstacles[i];
+            // Check if look-ahead point is inside obstacle
+            if (laX > ob.minX && laX < ob.maxX && laZ > ob.minZ && laZ < ob.maxZ) {
+              // Steer away from obstacle center
+              const obCx = (ob.minX + ob.maxX) / 2;
+              const obCz = (ob.minZ + ob.maxZ) / 2;
+              const awayX = px - obCx;
+              const awayZ = pz - obCz;
+              const awayLen = Math.sqrt(awayX * awayX + awayZ * awayZ);
+              if (awayLen > 0.01) {
+                avoidX += (awayX / awayLen) * 0.8;
+                avoidZ += (awayZ / awayLen) * 0.8;
+              }
+            }
+            // Also check if current position is very close to AABB (proximity force)
+            const clampX = Math.max(ob.minX, Math.min(px, ob.maxX));
+            const clampZ = Math.max(ob.minZ, Math.min(pz, ob.maxZ));
+            const distToOb = Math.sqrt((px - clampX) ** 2 + (pz - clampZ) ** 2);
+            if (distToOb < 0.3 && distToOb > 0.001) {
+              const repelStr = (0.3 - distToOb) / 0.3;
+              avoidX += ((px - clampX) / distToOb) * repelStr * 0.5;
+              avoidZ += ((pz - clampZ) / distToOb) * repelStr * 0.5;
+            }
+          }
+
+          // 5. Meeting table circle avoidance (skip for walking-to-meeting)
+          if (b.internalState !== 'walking-to-meeting') {
+            const mt = collisionData.meetingTable;
+            const mtMinDist = mt.radius + collisionData.agentRadius + 0.2;
+            // Check look-ahead against table
+            const laMtDx = laX - mt.x;
+            const laMtDz = laZ - mt.z;
+            const laMtDist = Math.sqrt(laMtDx * laMtDx + laMtDz * laMtDz);
+            if (laMtDist < mtMinDist && laMtDist > 0.01) {
+              const pushStr = (mtMinDist - laMtDist) / mtMinDist;
+              avoidX += (laMtDx / laMtDist) * pushStr * 0.8;
+              avoidZ += (laMtDz / laMtDist) * pushStr * 0.8;
+            }
+            // Also check current position proximity
+            const curMtDx = px - mt.x;
+            const curMtDz = pz - mt.z;
+            const curMtDist = Math.sqrt(curMtDx * curMtDx + curMtDz * curMtDz);
+            if (curMtDist < mtMinDist && curMtDist > 0.01) {
+              const pushStr = (mtMinDist - curMtDist) / mtMinDist;
+              avoidX += (curMtDx / curMtDist) * pushStr * 0.6;
+              avoidZ += (curMtDz / curMtDist) * pushStr * 0.6;
+            }
+          }
+
+          // 6. Agent avoidance (only agents ahead of us)
           for (let i = 0; i < totalAgents; i++) {
             if (i === agentIndex) continue;
             const ox = sharedPositions[i * 2];
             const oz = sharedPositions[i * 2 + 1];
-            const adx = px - ox;
-            const adz = pz - oz;
-            const adist = Math.sqrt(adx * adx + adz * adz);
-            if (adist < collisionData.minAgentDist && adist > 0.001) {
-              const push = (collisionData.minAgentDist - adist) * 0.5;
-              px += (adx / adist) * push;
-              pz += (adz / adist) * push;
+            const toDx = ox - px;
+            const toDz = oz - pz;
+            const dist = Math.sqrt(toDx * toDx + toDz * toDz);
+            if (dist < 1.5 && dist > 0.001) {
+              // Dot product: is this agent in front of us?
+              const dot = ndx * toDx + ndz * toDz;
+              if (dot > -0.3) {
+                // Steer away perpendicular to walk direction
+                const awayX = px - ox;
+                const awayZ = pz - oz;
+                const awayLen = Math.sqrt(awayX * awayX + awayZ * awayZ);
+                if (awayLen > 0.01) {
+                  const strength = (1.5 - dist) / 1.5 * 0.6;
+                  avoidX += (awayX / awayLen) * strength;
+                  avoidZ += (awayZ / awayLen) * strength;
+                }
+              }
             }
           }
+        }
 
-          // 2. Obstacle AABB pushout (desks)
+        // 7. Smooth the avoidance force (lerp toward target)
+        const lerpRate = 0.1;
+        b.smoothAvoidX = b.smoothAvoidX + (avoidX - b.smoothAvoidX) * lerpRate;
+        b.smoothAvoidZ = b.smoothAvoidZ + (avoidZ - b.smoothAvoidZ) * lerpRate;
+
+        // 8. Apply steering offset
+        px += b.smoothAvoidX;
+        pz += b.smoothAvoidZ;
+
+        // 9. Safety clamp — room bounds + divider wall (rarely triggers)
+        if (collisionData) {
+          // Divider wall hard clamp
+          const div = collisionData.divider;
+          const inDoorZone = pz > div.doorZMin && pz < div.doorZMax;
+          if (!inDoorZone) {
+            const wallPad = collisionData.agentRadius;
+            if (b.lastSideOfDivider < 0 && px > div.x - wallPad) {
+              px = div.x - wallPad;
+            } else if (b.lastSideOfDivider > 0 && px < div.x + wallPad) {
+              px = div.x + wallPad;
+            }
+          } else {
+            if (px < div.x) b.lastSideOfDivider = -1;
+            else b.lastSideOfDivider = 1;
+          }
+
+          // Room bounds
+          const rb = collisionData.roomBounds;
+          if (px < rb.minX) px = rb.minX;
+          if (px > rb.maxX) px = rb.maxX;
+          if (pz < rb.minZ) pz = rb.minZ;
+          if (pz > rb.maxZ) pz = rb.maxZ;
+
+          // Hard obstacle clamp (safety net — should rarely fire with steering)
           for (let i = 0; i < collisionData.obstacles.length; i++) {
             const ob = collisionData.obstacles[i];
             if (px > ob.minX && px < ob.maxX && pz > ob.minZ && pz < ob.maxZ) {
-              // Find shortest escape direction
               const escapeLeft = px - ob.minX;
               const escapeRight = ob.maxX - px;
               const escapeTop = pz - ob.minZ;
@@ -320,7 +515,7 @@ export default function AgentModel({
             }
           }
 
-          // 3. Meeting table circle collision (only for non-meeting agents)
+          // Hard meeting table clamp (safety)
           if (b.internalState !== 'walking-to-meeting') {
             const mt = collisionData.meetingTable;
             const mtdx = px - mt.x;
@@ -332,41 +527,21 @@ export default function AgentModel({
               pz = mt.z + (mtdz / mtdist) * mtMinDist;
             }
           }
-
-          // 4. Divider wall collision
-          const div = collisionData.divider;
-          const inDoorZone = pz > div.doorZMin && pz < div.doorZMax;
-          if (!inDoorZone) {
-            const wallPad = collisionData.agentRadius;
-            // If agent is trying to cross the wall
-            if (b.lastSideOfDivider < 0 && px > div.x - wallPad) {
-              px = div.x - wallPad;
-            } else if (b.lastSideOfDivider > 0 && px < div.x + wallPad) {
-              px = div.x + wallPad;
-            }
-          } else {
-            // In door zone — update side tracking
-            if (px < div.x) b.lastSideOfDivider = -1;
-            else b.lastSideOfDivider = 1;
-          }
-
-          // 5. Room bounds clamping
-          const rb = collisionData.roomBounds;
-          if (px < rb.minX) px = rb.minX;
-          if (px > rb.maxX) px = rb.maxX;
-          if (pz < rb.minZ) pz = rb.minZ;
-          if (pz > rb.maxZ) pz = rb.maxZ;
         }
 
         groupRef.current.position.x = px;
         groupRef.current.position.z = pz;
         groupRef.current.position.y = Math.abs(Math.sin(t * 8)) * 0.035;
 
-        const dx = b.targetPos.x - b.startPos.x;
-        const dz = b.targetPos.z - b.startPos.z;
-        if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
-          b.targetRotY = Math.atan2(dx, dz);
+        // 10. Rotation based on actual frame-to-frame movement direction
+        const frameDx = px - b.prevFrameX;
+        const frameDz = pz - b.prevFrameZ;
+        if (Math.abs(frameDx) > 0.001 || Math.abs(frameDz) > 0.001) {
+          b.targetRotY = Math.atan2(frameDx, frameDz);
         }
+        b.prevFrameX = px;
+        b.prevFrameZ = pz;
+
         groupRef.current.rotation.y = b.currentRotY;
         groupRef.current.rotation.z = Math.sin(t * 6) * 0.03;
         groupRef.current.rotation.x = 0;
@@ -390,32 +565,9 @@ export default function AgentModel({
       }
 
       case 'pausing-at-waypoint': {
-        let px = b.currentPos.x;
-        let pz = b.currentPos.z;
-
-        // Apply agent-agent separation even while pausing
-        if (collisionData && sharedPositions) {
-          for (let i = 0; i < totalAgents; i++) {
-            if (i === agentIndex) continue;
-            const ox = sharedPositions[i * 2];
-            const oz = sharedPositions[i * 2 + 1];
-            const adx = px - ox;
-            const adz = pz - oz;
-            const adist = Math.sqrt(adx * adx + adz * adz);
-            if (adist < collisionData.minAgentDist && adist > 0.001) {
-              const push = (collisionData.minAgentDist - adist) * 0.3;
-              px += (adx / adist) * push;
-              pz += (adz / adist) * push;
-            }
-          }
-
-          // Room bounds
-          const rb = collisionData.roomBounds;
-          if (px < rb.minX) px = rb.minX;
-          if (px > rb.maxX) px = rb.maxX;
-          if (pz < rb.minZ) pz = rb.minZ;
-          if (pz > rb.maxZ) pz = rb.maxZ;
-        }
+        // Agent is stationary — walkers steer around us via their own steering
+        const px = b.currentPos.x;
+        const pz = b.currentPos.z;
 
         groupRef.current.position.x = px;
         groupRef.current.position.z = pz;
@@ -426,7 +578,6 @@ export default function AgentModel({
         groupRef.current.rotation.z = 0;
         const pauseBreathe = 1 + Math.sin(t * 0.9 + b.bobPhase) * 0.003;
         groupRef.current.scale.set(scale * pauseBreathe, scale * pauseBreathe, scale * pauseBreathe);
-        b.currentPos.set(px, 0, pz);
         break;
       }
     }
