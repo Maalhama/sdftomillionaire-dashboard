@@ -6,3 +6,8 @@ node_modules
 .env.production
 dashboard.log
 .env*.local
+.env.vercel-check
+*.backup
+*.bak
+supabase/.temp/
+tsconfig.tsbuildinfo
