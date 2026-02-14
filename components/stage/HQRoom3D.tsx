@@ -73,6 +73,31 @@ const meetingSeatPositions: [number, number, number][] = [
   [2, 0, -0.9],     // seat 5
 ];
 
+// Roam waypoints — positions scattered across both rooms for agents to walk through
+const ROAM_WAYPOINTS: [number, number, number][] = [
+  // Office area (left side)
+  [-5.5, 0, -3.5],   // back-left corner
+  [-5.5, 0, 3.5],    // front-left corner
+  [-3.2, 0, -1.2],   // between desk rows top
+  [-3.2, 0, 1.2],    // between desk rows bottom
+  [-1, 0, -3.5],     // right of desks top
+  [-1, 0, 3.5],      // right of desks bottom
+  [-1, 0, 0],        // center right of desks
+  // Doorway area
+  [0.3, 0, 0],       // in the door
+  // Meeting room (right side)
+  [1.5, 0, -3.5],    // meeting room top-left
+  [1.5, 0, 3.5],     // meeting room bottom-left
+  [2.5, 0, -2],      // near table top-left
+  [4.5, 0, -2],      // near table top-right
+  [5.5, 0, 0],       // right of table
+  [4.5, 0, 2],       // near table bottom-right
+  [2.5, 0, 2],       // near table bottom-left
+  [5.5, 0, -3.5],    // meeting room top-right corner
+  [5.5, 0, 3.5],     // meeting room bottom-right corner
+  [1.5, 0, 0],       // meeting room left center
+];
+
 // Agent configs — positions are at their desks
 const agentConfigs = [
   {
@@ -84,7 +109,7 @@ const agentConfigs = [
     deskIndex: 4,
     position: deskPositions[4],
     rotation: [0, 90, 0] as [number, number, number],
-    status: 'active' as const,
+    status: 'working' as AgentStatus,
     color: '#f59e0b',
     thought: 'Review des propositions...',
   },
@@ -97,7 +122,7 @@ const agentConfigs = [
     deskIndex: 1,
     position: deskPositions[1],
     rotation: [0, 90, 0] as [number, number, number],
-    status: 'working' as const,
+    status: 'working' as AgentStatus,
     color: '#8b5cf6',
     thought: 'Validation des findings',
   },
@@ -110,7 +135,7 @@ const agentConfigs = [
     deskIndex: 2,
     position: deskPositions[2],
     rotation: [0, 90, 0] as [number, number, number],
-    status: 'idle' as const,
+    status: 'idle' as AgentStatus,
     color: '#22c55e',
     thought: 'En attente ; prochain: Standup',
   },
@@ -123,7 +148,7 @@ const agentConfigs = [
     deskIndex: 3,
     position: deskPositions[3],
     rotation: [0, 90, 0] as [number, number, number],
-    status: 'idle' as const,
+    status: 'idle' as AgentStatus,
     color: '#ec4899',
     thought: 'Brainstorm headlines',
   },
@@ -136,7 +161,7 @@ const agentConfigs = [
     deskIndex: 0,
     position: deskPositions[0],
     rotation: [0, 90, 0] as [number, number, number],
-    status: 'idle' as const,
+    status: 'idle' as AgentStatus,
     color: '#3b82f6',
     thought: 'Review coordination auto',
   },
@@ -149,7 +174,7 @@ const agentConfigs = [
     deskIndex: 5,
     position: deskPositions[5],
     rotation: [0, 90, 0] as [number, number, number],
-    status: 'sync' as const,
+    status: 'idle' as AgentStatus,
     color: '#ef4444',
     thought: 'Surveillance active',
   },
@@ -462,8 +487,8 @@ function SpeechBubble({
   position: [number, number, number];
 }) {
   const [expanded, setExpanded] = useState(false);
-  const displayText = status === 'sync' ? '>_ sync_meeting...' : thought;
-  const icon = status === 'sync' ? '⟩⟩' : '>_';
+  const displayText = status === 'discussing' ? '💬 ' + thought : thought;
+  const icon = status === 'discussing' ? '⟩⟩' : '>_';
 
   return (
     <Html position={[position[0], position[1] + 2.2, position[2]]} center style={{ pointerEvents: 'auto' }}>
@@ -583,6 +608,11 @@ function AgentStation({
 }: {
   config: typeof agentConfigs[0]; configIndex: number;
 }) {
+  // Bubble logic: idle → SleepBubble (desk), working → SpeechBubble (desk),
+  // discussing → SpeechBubble (table position), roaming → no bubble
+  const showSleepBubble = config.status === 'idle';
+  const showSpeechBubble = config.status === 'working' || config.status === 'discussing';
+
   return (
     <>
       {/* 3D Model */}
@@ -595,6 +625,7 @@ function AgentStation({
         color={config.color}
         allAgentPositions={allDeskPositions}
         meetingPositions={meetingSeatPositions}
+        roamWaypoints={ROAM_WAYPOINTS}
         agentIndex={configIndex}
       />
 
@@ -607,16 +638,19 @@ function AgentStation({
       {/* Floor ring */}
       <FloorRing position={config.position} color={config.color} />
 
-      {/* Bubble: ZzzzZZ for idle, Habbo speech for active */}
-      {config.status === 'idle' ? (
+      {/* Bubbles based on status */}
+      {showSleepBubble && (
         <SleepBubble position={config.position} name={config.name} color={config.color} />
-      ) : (
+      )}
+      {showSpeechBubble && (
         <SpeechBubble
           name={config.name}
           color={config.color}
           thought={config.thought}
           status={config.status}
-          position={config.position}
+          position={config.status === 'discussing'
+            ? meetingSeatPositions[configIndex % meetingSeatPositions.length]
+            : config.position}
         />
       )}
     </>
@@ -669,9 +703,11 @@ function CameraResetter({ controlsRef }: { controlsRef: React.RefObject<any> }) 
   return null;
 }
 
+export type AgentStatus = 'idle' | 'working' | 'discussing' | 'roaming';
+
 export interface AgentLiveData {
   id: string;
-  status: 'active' | 'working' | 'idle' | 'sync';
+  status: AgentStatus;
   thought: string;
 }
 

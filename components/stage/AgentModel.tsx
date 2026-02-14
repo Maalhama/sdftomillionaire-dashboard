@@ -4,23 +4,42 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import type { AgentStatus } from './HQRoom3D';
 
 useGLTF.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 
 // Preload all models so they start downloading immediately
 ['/models/minion.glb', '/models/sage.glb', '/models/scout.glb', '/models/quill.glb', '/models/xalt.glb', '/models/observer.glb'].forEach((p) => useGLTF.preload(p));
 
-type AgentState = 'idle' | 'working' | 'walking-to-meeting' | 'meeting' | 'returning';
+type InternalState =
+  | 'idle'
+  | 'working'
+  | 'walking-to-meeting'
+  | 'meeting'
+  | 'walking-to-waypoint'
+  | 'pausing-at-waypoint'
+  | 'returning-to-desk';
+
+// Fisher-Yates shuffle (deterministic per call)
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 interface AgentModelProps {
   modelPath: string;
   position: [number, number, number];
   rotation?: [number, number, number];
   scale?: number;
-  status: 'active' | 'working' | 'idle' | 'sync';
+  status: AgentStatus;
   color: string;
   allAgentPositions?: [number, number, number][];
   meetingPositions?: [number, number, number][];
+  roamWaypoints?: [number, number, number][];
   agentIndex?: number;
   onClick?: () => void;
   onPointerOver?: () => void;
@@ -34,20 +53,20 @@ export default function AgentModel({
   scale = 1,
   status,
   color,
-  allAgentPositions = [],
   meetingPositions = [],
+  roamWaypoints = [],
   agentIndex = 0,
-  onClick,
-  onPointerOver,
-  onPointerOut,
 }: AgentModelProps) {
   const groupRef = useRef<THREE.Group>(null);
   const { scene } = useGLTF(modelPath);
 
+  // Walk speed varies per agent (1.5 to 2.0, seeded by agentIndex)
+  const walkSpeed = useMemo(() => 1.5 + (agentIndex * 0.1) % 0.5, [agentIndex]);
+
   const behaviorRef = useRef({
-    state: (status === 'idle' ? 'idle' : status === 'sync' ? 'walking-to-meeting' : 'working') as AgentState,
+    internalState: 'idle' as InternalState,
     stateTimer: 0,
-    stateDuration: status === 'sync' ? 2.5 : 999,
+    stateDuration: 999,
     currentPos: new THREE.Vector3(position[0], position[1], position[2]),
     startPos: new THREE.Vector3(position[0], position[1], position[2]),
     targetPos: new THREE.Vector3(position[0], position[1], position[2]),
@@ -57,32 +76,87 @@ export default function AgentModel({
     currentRotY: rotation[1] * Math.PI / 180,
     targetRotY: rotation[1] * Math.PI / 180,
     prevStatus: status,
-    meetingCycleDone: false,
+    // Roaming state
+    shuffledWaypoints: shuffleArray(roamWaypoints),
+    waypointIndex: 0,
+    pauseDuration: 2 + Math.random() * 3, // 2-5s pause at waypoints
   });
 
-  // React to status prop changes
   const b = behaviorRef.current;
+
+  // Compute walk duration based on distance
+  const computeWalkDuration = (from: THREE.Vector3, to: THREE.Vector3) => {
+    const dist = from.distanceTo(to);
+    return Math.max(0.5, dist / walkSpeed);
+  };
+
+  // Start walking to a specific target
+  const startWalkTo = (target: THREE.Vector3, nextState: InternalState) => {
+    b.startPos.copy(b.currentPos);
+    b.targetPos.copy(target);
+    b.stateTimer = 0;
+    b.stateDuration = computeWalkDuration(b.currentPos, target);
+    b.internalState = nextState;
+  };
+
+  // Pick next roam waypoint
+  const pickNextWaypoint = () => {
+    if (b.shuffledWaypoints.length === 0) return;
+    if (b.waypointIndex >= b.shuffledWaypoints.length) {
+      b.shuffledWaypoints = shuffleArray(roamWaypoints);
+      b.waypointIndex = 0;
+    }
+    const wp = b.shuffledWaypoints[b.waypointIndex];
+    b.waypointIndex++;
+    const target = new THREE.Vector3(wp[0], 0, wp[2]);
+    startWalkTo(target, 'walking-to-waypoint');
+  };
+
+  // React to status prop changes
   if (status !== b.prevStatus) {
     b.prevStatus = status;
-    b.meetingCycleDone = false;
 
-    if (status === 'idle') {
-      b.state = 'idle';
-      b.stateTimer = 0;
-      b.stateDuration = 999;
-    } else if (status === 'sync' && meetingPositions.length > 0) {
-      const seatIdx = agentIndex % meetingPositions.length;
-      const seat = meetingPositions[seatIdx];
-      b.meetingSeat.set(seat[0], 0, seat[2]);
-      b.startPos.copy(b.homePos);
-      b.targetPos.copy(b.meetingSeat);
-      b.state = 'walking-to-meeting';
-      b.stateTimer = 0;
-      b.stateDuration = 2.5;
-    } else {
-      b.state = 'working';
-      b.stateTimer = 0;
-      b.stateDuration = 999;
+    switch (status) {
+      case 'discussing': {
+        if (meetingPositions.length > 0) {
+          const seatIdx = agentIndex % meetingPositions.length;
+          const seat = meetingPositions[seatIdx];
+          b.meetingSeat.set(seat[0], 0, seat[2]);
+          startWalkTo(b.meetingSeat, 'walking-to-meeting');
+        }
+        break;
+      }
+      case 'roaming': {
+        if (roamWaypoints.length > 0) {
+          b.shuffledWaypoints = shuffleArray(roamWaypoints);
+          b.waypointIndex = 0;
+          pickNextWaypoint();
+        }
+        break;
+      }
+      case 'idle': {
+        // If not at desk, walk back; otherwise go idle directly
+        const distToHome = b.currentPos.distanceTo(b.homePos);
+        if (distToHome > 0.3) {
+          startWalkTo(b.homePos, 'returning-to-desk');
+        } else {
+          b.internalState = 'idle';
+          b.stateTimer = 0;
+          b.stateDuration = 999;
+        }
+        break;
+      }
+      case 'working': {
+        const distToHome2 = b.currentPos.distanceTo(b.homePos);
+        if (distToHome2 > 0.3) {
+          startWalkTo(b.homePos, 'returning-to-desk');
+        } else {
+          b.internalState = 'working';
+          b.stateTimer = 0;
+          b.stateDuration = 999;
+        }
+        break;
+      }
     }
   }
 
@@ -93,19 +167,21 @@ export default function AgentModel({
     return { clonedScene: clone, yOffset: offset };
   }, [scene]);
 
-  // Initialize sync agents on first render
+  // Initialize on first render
   const initialized = useRef(false);
   if (!initialized.current) {
     initialized.current = true;
-    if (status === 'sync' && meetingPositions.length > 0) {
+    if (status === 'discussing' && meetingPositions.length > 0) {
       const seatIdx = agentIndex % meetingPositions.length;
       const seat = meetingPositions[seatIdx];
       b.meetingSeat.set(seat[0], 0, seat[2]);
-      b.startPos.copy(b.homePos);
-      b.targetPos.copy(b.meetingSeat);
-      b.state = 'walking-to-meeting';
-      b.stateTimer = 0;
-      b.stateDuration = 2.5;
+      startWalkTo(b.meetingSeat, 'walking-to-meeting');
+    } else if (status === 'roaming' && roamWaypoints.length > 0) {
+      b.shuffledWaypoints = shuffleArray(roamWaypoints);
+      b.waypointIndex = 0;
+      pickNextWaypoint();
+    } else if (status === 'working') {
+      b.internalState = 'working';
     }
   }
 
@@ -116,34 +192,42 @@ export default function AgentModel({
 
     b.stateTimer += delta;
 
-    // State transitions for meeting cycle only (sync status)
+    // State transitions when timer expires
     if (b.stateTimer >= b.stateDuration) {
-      switch (b.state) {
-        case 'walking-to-meeting':
+      switch (b.internalState) {
+        case 'walking-to-meeting': {
           b.currentPos.copy(b.meetingSeat);
-          b.state = 'meeting';
+          b.internalState = 'meeting';
           b.stateTimer = 0;
-          b.stateDuration = 5;
+          b.stateDuration = 999; // stay until status changes
           break;
-
-        case 'meeting':
-          b.startPos.copy(b.currentPos);
-          b.targetPos.copy(b.homePos);
-          b.state = 'returning';
+        }
+        case 'walking-to-waypoint': {
+          b.currentPos.copy(b.targetPos);
+          b.internalState = 'pausing-at-waypoint';
           b.stateTimer = 0;
-          b.stateDuration = 2.5;
+          b.pauseDuration = 2 + Math.random() * 3;
+          b.stateDuration = b.pauseDuration;
           break;
-
-        case 'returning':
+        }
+        case 'pausing-at-waypoint': {
+          // If still roaming, pick next waypoint
+          if (status === 'roaming' && roamWaypoints.length > 0) {
+            pickNextWaypoint();
+          } else {
+            // Status changed while pausing, go back to desk
+            startWalkTo(b.homePos, 'returning-to-desk');
+          }
+          break;
+        }
+        case 'returning-to-desk': {
           b.currentPos.copy(b.homePos);
-          b.meetingCycleDone = true;
-          // Return to working after meeting cycle
-          b.state = 'working';
+          b.internalState = status === 'working' ? 'working' : 'idle';
           b.stateTimer = 0;
           b.stateDuration = 999;
           break;
-
-        // idle and working don't transition on timer
+        }
+        // idle, working, meeting don't auto-transition
         default:
           break;
       }
@@ -157,82 +241,78 @@ export default function AgentModel({
     // Smooth rotation
     b.currentRotY = THREE.MathUtils.lerp(b.currentRotY, b.targetRotY, 0.05);
 
-    switch (b.state) {
+    switch (b.internalState) {
       case 'idle': {
-        // At desk — minimal breathing only, no sway
         groupRef.current.position.x = b.homePos.x;
         groupRef.current.position.z = b.homePos.z;
         groupRef.current.position.y = Math.sin(t * 0.6 + b.bobPhase) * 0.003;
-
         groupRef.current.rotation.x = 0;
         b.targetRotY = rotation[1] * Math.PI / 180;
         groupRef.current.rotation.y = b.currentRotY;
         groupRef.current.rotation.z = 0;
-
-        // Minimal breathing
         const idleBreathe = 1 + Math.sin(t * 0.6 + b.bobPhase) * 0.002;
         groupRef.current.scale.set(scale * idleBreathe, scale * idleBreathe, scale * idleBreathe);
         break;
       }
 
       case 'working': {
-        // At desk — subtle working animations
         groupRef.current.position.x = b.homePos.x;
         groupRef.current.position.z = b.homePos.z;
         groupRef.current.position.y = Math.sin(t * 1.2 + b.bobPhase) * 0.008;
-
-        // Working sway
         groupRef.current.rotation.x = Math.sin(t * 0.8 + b.bobPhase) * 0.02;
         b.targetRotY = rotation[1] * Math.PI / 180;
         groupRef.current.rotation.y = b.currentRotY;
         groupRef.current.rotation.z = Math.sin(t * 1.5 + b.bobPhase) * 0.01;
-
-        // Breathing scale
         const breathe = 1 + Math.sin(t * 1.2 + b.bobPhase) * 0.005;
         groupRef.current.scale.set(scale * breathe, scale * breathe, scale * breathe);
         break;
       }
 
       case 'walking-to-meeting':
-      case 'returning': {
-        // Walking between desk and meeting room
+      case 'walking-to-waypoint':
+      case 'returning-to-desk': {
         groupRef.current.position.x = THREE.MathUtils.lerp(b.startPos.x, b.targetPos.x, ease);
         groupRef.current.position.z = THREE.MathUtils.lerp(b.startPos.z, b.targetPos.z, ease);
-        // Walking bob
         groupRef.current.position.y = Math.abs(Math.sin(t * 8)) * 0.035;
-        // Face direction
         const dx = b.targetPos.x - b.startPos.x;
         const dz = b.targetPos.z - b.startPos.z;
         if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
           b.targetRotY = Math.atan2(dx, dz);
         }
         groupRef.current.rotation.y = b.currentRotY;
-        // Walking tilt
         groupRef.current.rotation.z = Math.sin(t * 6) * 0.03;
         groupRef.current.rotation.x = 0;
         groupRef.current.scale.set(scale, scale, scale);
-
-        // Update current position
         b.currentPos.set(groupRef.current.position.x, 0, groupRef.current.position.z);
         break;
       }
 
       case 'meeting': {
-        // At meeting table — face center of table (3.5, 0, 0)
         groupRef.current.position.x = b.meetingSeat.x;
         groupRef.current.position.z = b.meetingSeat.z;
         groupRef.current.position.y = Math.sin(t * 1.5 + b.bobPhase) * 0.01;
-
-        // Face the center of the meeting table
         const toDx = 3.5 - b.meetingSeat.x;
         const toDz = 0 - b.meetingSeat.z;
         b.targetRotY = Math.atan2(toDx, toDz);
         groupRef.current.rotation.y = b.currentRotY;
-
-        // Talking nod
         groupRef.current.rotation.x = Math.sin(t * 2.5 + b.bobPhase) * 0.04;
         groupRef.current.rotation.z = Math.sin(t * 1.8 + b.bobPhase) * 0.02;
         groupRef.current.scale.set(scale, scale, scale);
+        break;
+      }
+
+      case 'pausing-at-waypoint': {
+        // Stand still at waypoint, look around subtly
+        groupRef.current.position.x = b.currentPos.x;
+        groupRef.current.position.z = b.currentPos.z;
+        groupRef.current.position.y = Math.sin(t * 0.8 + b.bobPhase) * 0.005;
+        // Slow look-around rotation
+        b.targetRotY += Math.sin(t * 0.5 + b.bobPhase) * 0.002;
+        groupRef.current.rotation.y = b.currentRotY;
+        groupRef.current.rotation.x = 0;
+        groupRef.current.rotation.z = 0;
+        const pauseBreathe = 1 + Math.sin(t * 0.9 + b.bobPhase) * 0.003;
+        groupRef.current.scale.set(scale * pauseBreathe, scale * pauseBreathe, scale * pauseBreathe);
         break;
       }
     }
@@ -244,9 +324,6 @@ export default function AgentModel({
       position={position}
       rotation={rotation.map(r => r * Math.PI / 180) as unknown as THREE.Euler}
       scale={[scale, scale, scale]}
-      onClick={onClick}
-      onPointerOver={onPointerOver}
-      onPointerOut={onPointerOut}
     >
       <primitive object={clonedScene} position={[0, yOffset, 0]} />
 

@@ -15,7 +15,7 @@ const HQRoom3D = dynamic(() => import('@/components/stage/HQRoom3D'), {
   ),
 });
 
-import type { AgentLiveData } from '@/components/stage/HQRoom3D';
+import type { AgentLiveData, AgentStatus } from '@/components/stage/HQRoom3D';
 
 interface Event {
   id: string;
@@ -62,10 +62,10 @@ interface Roundtable {
 }
 
 const statusMap: Record<string, { dot: string; label: string }> = {
-  active: { dot: 'status-active', label: 'ACTIVE' },
+  discussing: { dot: 'status-active', label: 'DISCUSSION' },
+  roaming: { dot: 'status-active', label: 'EN MISSION' },
   working: { dot: 'status-working', label: 'WORKING' },
   idle: { dot: 'status-idle', label: 'IDLE' },
-  sync: { dot: 'status-working', label: 'SYNC' },
 };
 
 export default function StagePage() {
@@ -170,13 +170,32 @@ export default function StagePage() {
   const getAgentEmoji = (agentId: string) => AGENTS[agentId as AgentId]?.emoji || '🤖';
   const getAgentAvatar = (agentId: string) => AGENTS[agentId as AgentId]?.avatar || '/agents/opus.png';
 
-  const getAgentStatus = (agentId: string) => {
+  const getAgentStatus = (agentId: string): AgentStatus => {
+    // 1. Roundtable active + agent is participant → discussing
+    if (
+      activeRoundtable &&
+      (activeRoundtable.status === 'running' || activeRoundtable.status === 'pending') &&
+      activeRoundtable.participants.includes(agentId)
+    ) {
+      return 'discussing';
+    }
+
+    // 2. Active build (status = building) → roaming (agents are working)
+    const hasActiveBuild = activeBuilds.some(b => b.status === 'building');
     const recentEvent = events.find(e => e.agent_id === agentId);
     if (!recentEvent) return 'idle';
-    
+
     const minutesAgo = (Date.now() - new Date(recentEvent.created_at).getTime()) / 60000;
-    if (minutesAgo < 5) return 'active';
+
+    if (hasActiveBuild && minutesAgo < 15) return 'roaming';
+
+    // 3. Recent event < 5min → roaming (active agent walking around)
+    if (minutesAgo < 5) return 'roaming';
+
+    // 4. Recent event 5-15min → working (at desk)
     if (minutesAgo < 15) return 'working';
+
+    // 5. No recent event → idle (sleeping at desk)
     return 'idle';
   };
 
@@ -274,11 +293,11 @@ export default function StagePage() {
   // Build live agent data for 3D room
   const liveAgents: AgentLiveData[] = agentsWithStats.map(a => ({
     id: a.id,
-    status: a.status as 'active' | 'working' | 'idle' | 'sync',
+    status: a.status as AgentStatus,
     thought: a.thought,
   }));
 
-  const activeCount = agentsWithStats.filter(a => a.status === 'active').length;
+  const activeCount = agentsWithStats.filter(a => a.status === 'discussing' || a.status === 'roaming').length;
   const workingCount = agentsWithStats.filter(a => a.status === 'working').length;
   const idleCount = agentsWithStats.filter(a => a.status === 'idle').length;
 
