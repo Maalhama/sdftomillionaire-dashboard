@@ -184,18 +184,18 @@ export default function StagePage() {
       return 'discussing';
     }
 
-    // 1b. Roundtable just finished — keep agents at table until all chat bubbles played
-    // Formula: 10s walk + turns*5s interval + 15s reading time
+    // 1b. Roundtable finished recently — keep agents at table for 3 minutes from start
+    // This guarantees all chat bubbles (12s walk + 6 turns * 6s + reading) have time to play
     if (
       activeRoundtable &&
       activeRoundtable.participants.includes(agentId) &&
-      (activeRoundtable.status === 'succeeded' || activeRoundtable.status === 'failed') &&
-      activeRoundtable.finished_at
+      activeRoundtable.conversation_log?.length > 0
     ) {
-      const finishedAt = new Date(activeRoundtable.finished_at).getTime();
-      const turnCount = activeRoundtable.turn_count || activeRoundtable.conversation_log?.length || 6;
-      const cooldownMs = 15000 + turnCount * 7000 + 30000; // 15s walk + turns*7s interval + 30s reading buffer
-      if (Date.now() < finishedAt + cooldownMs) {
+      const startedAt = activeRoundtable.finished_at
+        ? new Date(activeRoundtable.finished_at).getTime()
+        : new Date(activeRoundtable.created_at).getTime();
+      // 3 minutes from finish (or creation) — ultra generous
+      if (Date.now() < startedAt + 180000) {
         return 'discussing';
       }
     }

@@ -1582,45 +1582,39 @@ interface ActiveBubble {
   createdAt: number;
 }
 
-// ── Habbo-style flat chat bar above speaking agent ──
-// Wide horizontal bar, avatar + name + text on one line (2 lines max if long)
-// Floats upward slowly, no overlap — each new message waits for the previous one
+// ── Habbo-style stacked chat log above the meeting table ──
+// Messages stack like Lego — new message appears at bottom, pushes all previous ones up
+// All messages remain visible as a conversation thread
 function HabboChatController({ conversationLog, isDiscussing }: { conversationLog?: ConversationTurn[]; isDiscussing: boolean }) {
-  const [visibleMessages, setVisibleMessages] = useState<(ActiveBubble & { offsetY: number; zOrder: number; opacity: number })[]>([]);
+  const [messages, setMessages] = useState<(ActiveBubble & { shownAt: number })[]>([]);
   const lastProcessedTurn = useRef(-1);
   const queueRef = useRef<ActiveBubble[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const discussionStartRef = useRef<number>(0);
-  const messageCounter = useRef(0);
+  const chatActiveRef = useRef(false);
 
   // Track discussion start
   useEffect(() => {
     if (isDiscussing && discussionStartRef.current === 0) {
       discussionStartRef.current = Date.now();
     }
-    if (!isDiscussing) {
-      discussionStartRef.current = 0;
-    }
   }, [isDiscussing]);
 
-  // Show next message — only one active at a time above the speaking agent
+  // Show next message from queue
   const showNext = useCallback(() => {
     if (queueRef.current.length === 0) {
       timerRef.current = null;
+      chatActiveRef.current = false;
       return;
     }
+    chatActiveRef.current = true;
     const next = queueRef.current.shift()!;
     next.createdAt = Date.now();
-    messageCounter.current += 1;
-    const zOrder = messageCounter.current;
 
-    setVisibleMessages(prev => [
-      ...prev,
-      { ...next, offsetY: 0, zOrder, opacity: 1 },
-    ]);
+    setMessages(prev => [...prev, { ...next, shownAt: Date.now() }]);
 
-    // Next message after 7s — good reading time + space between bubbles
-    timerRef.current = setTimeout(showNext, 7000);
+    // 6s between each message — comfortable reading pace
+    timerRef.current = setTimeout(showNext, 6000);
   }, []);
 
   // Queue new turns
@@ -1645,136 +1639,125 @@ function HabboChatController({ conversationLog, isDiscussing }: { conversationLo
       });
     }
 
+    // Start drain — wait for agents to reach the table first
     if (!timerRef.current) {
       const elapsed = Date.now() - discussionStartRef.current;
-      const walkDelay = Math.max(0, 10000 - elapsed);
+      const walkDelay = Math.max(0, 12000 - elapsed);
       timerRef.current = setTimeout(showNext, walkDelay);
     }
   }, [conversationLog, showNext]);
 
-  // Animate: float up + fade out older messages
+  // Reset ONLY when discussion ends AND no messages are queued AND chat is done
   useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now();
-      setVisibleMessages(prev => {
-        const updated = prev.map(m => {
-          const age = (now - m.createdAt) / 1000;
-          return {
-            ...m,
-            offsetY: age * 4, // 4px/s upward — slow rise, long visible trail
-            opacity: age > 20 ? Math.max(0, 1 - (age - 20) / 5) : 1,
-          };
-        });
-        // Remove fully faded messages (>25s old)
-        return updated.filter(m => (now - m.createdAt) < 25000);
-      });
-    }, 60);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Reset
-  useEffect(() => {
-    if (!isDiscussing) {
-      setVisibleMessages([]);
-      queueRef.current = [];
-      lastProcessedTurn.current = -1;
-      messageCounter.current = 0;
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
+    if (!isDiscussing && !chatActiveRef.current && queueRef.current.length === 0) {
+      // Wait a bit before clearing so user can read the last messages
+      const timeout = setTimeout(() => {
+        setMessages([]);
+        lastProcessedTurn.current = -1;
+        discussionStartRef.current = 0;
+      }, 15000);
+      return () => clearTimeout(timeout);
     }
   }, [isDiscussing]);
 
+  if (messages.length === 0) return null;
+
+  // The stack: newest message at bottom, all stacked vertically above the table
+  const BAR_HEIGHT = 38; // approx height of one message bar in px
+  const GAP = 4;
+
   return (
-    <>
-      {visibleMessages.map(msg => (
-        <Html
-          key={`habbo-${msg.id}`}
-          position={[msg.seatPos[0], msg.seatPos[1] + 2.8, msg.seatPos[2]]}
-          center
-          zIndexRange={[msg.zOrder + 100, msg.zOrder + 100]}
-          style={{ pointerEvents: 'none' }}
-        >
-          <div
-            className="select-none"
-            style={{
-              transform: `translateY(${-msg.offsetY}px)`,
-              opacity: msg.opacity,
-              zIndex: msg.zOrder,
-            }}
-          >
-            {/* Habbo flat chat bar — wide, dark, rectangular */}
+    <Html
+      position={[7, 4.5, 0]}
+      center
+      style={{ pointerEvents: 'none' }}
+    >
+      <div
+        className="select-none"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: `${GAP}px`,
+          width: '800px',
+        }}
+      >
+        {messages.map((msg, idx) => {
+          const isNewest = idx === messages.length - 1;
+          return (
             <div
+              key={`habbo-${msg.id}`}
               style={{
-                background: 'rgba(17, 17, 17, 0.88)',
-                borderRadius: '4px',
-                padding: '4px 12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                width: '680px',
-                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.5)',
-                borderLeft: `3px solid ${msg.color}`,
+                width: '100%',
+                animation: isNewest ? 'habboSlideUp 0.4s ease-out' : undefined,
+                zIndex: idx + 1, // newest at front
+                position: 'relative',
               }}
             >
-              {/* Avatar circle */}
+              {/* Habbo flat dark bar */}
               <div
                 style={{
-                  width: '20px',
-                  height: '20px',
-                  minWidth: '20px',
-                  borderRadius: '50%',
-                  background: msg.color,
-                  boxShadow: `0 0 4px ${msg.color}`,
+                  background: 'rgba(11, 11, 11, 0.92)',
+                  borderRadius: '3px',
+                  padding: '6px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.6)',
+                  borderLeft: `4px solid ${msg.color}`,
                 }}
-              />
-              {/* Name + message inline */}
-              <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                <span
-                  className="font-mono"
+              >
+                {/* Avatar circle */}
+                <div
                   style={{
-                    fontSize: '12px',
-                    fontWeight: 800,
-                    color: msg.color,
-                    whiteSpace: 'nowrap',
-                    marginRight: '6px',
+                    width: '22px',
+                    height: '22px',
+                    minWidth: '22px',
+                    borderRadius: '50%',
+                    background: msg.color,
+                    boxShadow: `0 0 6px ${msg.color}88`,
                   }}
-                >
-                  {msg.displayName}:
-                </span>
-                <span
-                  className="font-sans"
-                  style={{
-                    fontSize: '12px',
-                    lineHeight: 1.4,
-                    color: '#e5e5e5',
-                    wordBreak: 'break-word',
-                    display: '-webkit-inline-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {msg.text}
-                </span>
+                />
+                {/* Name + message inline */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span
+                    className="font-mono"
+                    style={{
+                      fontSize: '13px',
+                      fontWeight: 900,
+                      color: msg.color,
+                      whiteSpace: 'nowrap',
+                      marginRight: '8px',
+                    }}
+                  >
+                    {msg.displayName}:
+                  </span>
+                  <span
+                    className="font-sans"
+                    style={{
+                      fontSize: '13px',
+                      lineHeight: 1.5,
+                      color: '#e8e8e8',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {msg.text}
+                  </span>
+                </div>
               </div>
             </div>
-            {/* Small triangle pointer down to agent */}
-            <div
-              style={{
-                width: 0,
-                height: 0,
-                borderLeft: '5px solid transparent',
-                borderRight: '5px solid transparent',
-                borderTop: '6px solid rgba(17, 17, 17, 0.88)',
-                marginLeft: '24px',
-              }}
-            />
-          </div>
-        </Html>
-      ))}
-    </>
+          );
+        })}
+      </div>
+      <style>{`
+        @keyframes habboSlideUp {
+          0% { opacity: 0; transform: translateY(12px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+    </Html>
   );
 }
 
