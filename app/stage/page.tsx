@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Pause, Play, Monitor, CheckSquare, MessageCircle, Brain, Zap, MessageSquare, Rocket, Terminal, Activity, Eye, Search, PenTool, Megaphone, BarChart3, RefreshCw, Wrench, CheckCircle, Package } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -59,6 +59,7 @@ interface Roundtable {
     timestamp?: string;
   }>;
   created_at: string;
+  finished_at?: string;
 }
 
 const statusMap: Record<string, { dot: string; label: string }> = {
@@ -80,8 +81,7 @@ export default function StagePage() {
   const [loading, setLoading] = useState(true);
   const [activeRoundtable, setActiveRoundtable] = useState<Roundtable | null>(null);
   const [activeBuilds, setActiveBuilds] = useState<ActiveBuild[]>([]);
-  const [discussionCooldownUntil, setDiscussionCooldownUntil] = useState<number>(0);
-  const lastRoundtableStatusRef = useRef<string>('');
+  const [, setTick] = useState(0); // force re-render every second for cooldown
 
   const fetchData = useCallback(async () => {
     try {
@@ -147,10 +147,8 @@ export default function StagePage() {
   useEffect(() => {
     if (isPaused) return;
     const interval = setInterval(() => {
-      // Force re-render during discussion cooldown so agents stay at table
-      if (discussionCooldownUntil > Date.now()) {
-        setNow(new Date());
-      }
+      // Tick every second to re-render (needed for post-roundtable cooldown)
+      setTick(t => t + 1);
       setNextRefresh(prev => {
         if (prev <= 0) {
           fetchData();
@@ -161,22 +159,7 @@ export default function StagePage() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [isPaused, fetchData, discussionCooldownUntil]);
-
-  // When roundtable finishes (running → succeeded/failed), keep agents at table for 40s cooldown
-  useEffect(() => {
-    const prevStatus = lastRoundtableStatusRef.current;
-    const curStatus = activeRoundtable?.status || '';
-    lastRoundtableStatusRef.current = curStatus;
-
-    if (
-      (prevStatus === 'running' || prevStatus === 'pending') &&
-      (curStatus === 'succeeded' || curStatus === 'failed')
-    ) {
-      // Cooldown: keep discussing status for 40s so chat bubbles have time to play
-      setDiscussionCooldownUntil(Date.now() + 40000);
-    }
-  }, [activeRoundtable?.status]);
+  }, [isPaused, fetchData]);
 
   // Blinking cursor
   useEffect(() => {
@@ -192,7 +175,7 @@ export default function StagePage() {
   const getAgentAvatar = (agentId: string) => AGENTS[agentId as AgentId]?.avatar || '/agents/opus.png';
 
   const getAgentStatus = (agentId: string): AgentStatus => {
-    // 1. Roundtable active + agent is participant → discussing
+    // 1. Roundtable active (running/pending) → discussing
     if (
       activeRoundtable &&
       (activeRoundtable.status === 'running' || activeRoundtable.status === 'pending') &&
@@ -201,13 +184,20 @@ export default function StagePage() {
       return 'discussing';
     }
 
-    // 1b. Cooldown after roundtable ends — keep agents at table for chat bubbles
+    // 1b. Roundtable just finished — keep agents at table until all chat bubbles played
+    // Formula: 10s walk + turns*5s interval + 15s reading time
     if (
       activeRoundtable &&
       activeRoundtable.participants.includes(agentId) &&
-      Date.now() < discussionCooldownUntil
+      (activeRoundtable.status === 'succeeded' || activeRoundtable.status === 'failed') &&
+      activeRoundtable.finished_at
     ) {
-      return 'discussing';
+      const finishedAt = new Date(activeRoundtable.finished_at).getTime();
+      const turnCount = activeRoundtable.turn_count || activeRoundtable.conversation_log?.length || 6;
+      const cooldownMs = 10000 + turnCount * 5000 + 15000; // walk + messages + reading buffer
+      if (Date.now() < finishedAt + cooldownMs) {
+        return 'discussing';
+      }
     }
 
     // 2. Active build (status = building) → roaming (agents are working)
