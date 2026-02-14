@@ -406,7 +406,10 @@ export default function AgentModel({
             }
           }
 
-          // Agent avoidance — omnidirectional
+          // Agent avoidance — omnidirectional (reduced near doorway)
+          const inDoorZone = Math.abs(b.px - collisionData.divider.x) < 2.5
+            && b.pz > collisionData.divider.doorZMin && b.pz < collisionData.divider.doorZMax;
+          const agentAvoidStr = inDoorZone ? 0.8 : 2.5; // weaker near door so agents can pass
           for (let i = 0; i < totalAgents; i++) {
             if (i === agentIndex) continue;
             const ox = sharedPositions[i * 2];
@@ -416,7 +419,7 @@ export default function AgentModel({
             const dist = Math.sqrt(awayX * awayX + awayZ * awayZ);
             if (dist < 2.0 && dist > 0.001) {
               const t01 = (2.0 - dist) / 2.0;
-              const str = t01 * t01 * 2.5;
+              const str = t01 * t01 * agentAvoidStr;
               avoidVx += (awayX / dist) * str;
               avoidVz += (awayZ / dist) * str;
             }
@@ -560,8 +563,9 @@ export default function AgentModel({
         const questScale = 1 + Math.sin(t * 5) * 0.01;
         groupRef.current.scale.set(scale * questScale, scale * questScale, scale * questScale);
 
-        // After 2.5s → walk to meeting
-        if (b.stateTimer >= 2.5) {
+        // Stagger departures so agents don't all hit the door at once
+        const questDuration = 2.5 + agentIndex * 1.0;
+        if (b.stateTimer >= questDuration) {
           startWalkTo(b.meetingSeatX, b.meetingSeatZ, 'walking-to-meeting');
         }
         break;
