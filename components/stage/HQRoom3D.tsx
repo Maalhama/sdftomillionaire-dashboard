@@ -1504,7 +1504,7 @@ function SpeechBubble({
 // ═══ QUEST BUBBLE ═══
 function QuestBubble({ position, name, color }: { position: [number, number, number]; name: string; color: string }) {
   return (
-    <Html position={[position[0], position[1] + 2.2, position[2]]} center style={{ pointerEvents: 'none' }}>
+    <Html position={[position[0], position[1] + 1.3, position[2]]} center style={{ pointerEvents: 'none' }}>
       <div className="select-none" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
         {/* Quest "!" bubble */}
         <div
@@ -1796,9 +1796,9 @@ function AgentStation({ config, configIndex, teleportToMeeting }: { config: type
         />
       )}
 
-      {/* Quest received → "!" bubble follows agent live position */}
+      {/* Quest received → "!" on the agent's desk/computer */}
       {showQuestBubble && (
-        <QuestBubble position={livePos} name={config.name} color={config.color} />
+        <QuestBubble position={config.position} name={config.name} color={config.color} />
       )}
     </>
   );
