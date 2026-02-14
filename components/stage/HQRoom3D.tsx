@@ -1571,8 +1571,35 @@ function HabboChatStack({ conversationLog, isDiscussing }: { conversationLog?: C
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const lastProcessedTurn = useRef(-1);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const queueRef = useRef<ChatMessage[]>([]);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const discussionStartRef = useRef<number>(0);
 
-  // Add new messages as conversation_log grows (real-time via Supabase)
+  // Track when discussion starts (agents need ~10s to walk to table)
+  useEffect(() => {
+    if (isDiscussing && discussionStartRef.current === 0) {
+      discussionStartRef.current = Date.now();
+    }
+    if (!isDiscussing) {
+      discussionStartRef.current = 0;
+    }
+  }, [isDiscussing]);
+
+  // Drip-feed messages one by one from the queue
+  const drainQueue = useCallback(() => {
+    if (queueRef.current.length === 0) {
+      timerRef.current = null;
+      return;
+    }
+    const next = queueRef.current.shift()!;
+    next.createdAt = Date.now(); // timestamp when actually shown
+    setMessages(prev => [...prev, next]);
+
+    // Next message after 3s delay
+    timerRef.current = setTimeout(drainQueue, 3000);
+  }, []);
+
+  // Queue new messages as conversation_log grows
   useEffect(() => {
     if (!conversationLog || conversationLog.length === 0) return;
 
@@ -1586,18 +1613,26 @@ function HabboChatStack({ conversationLog, isDiscussing }: { conversationLog?: C
         speaker: t.speaker,
         text: t.dialogue || t.message || '',
         color: SPEAKER_COLORS[t.speaker] || '#00ff41',
-        createdAt: Date.now(),
+        createdAt: 0, // set when actually displayed
       };
     });
 
-    setMessages(prev => [...prev, ...newMessages]);
-  }, [conversationLog]);
+    queueRef.current.push(...newMessages);
 
-  // Scroll up animation: every 1.5s, remove messages older than 12s
+    // Start draining if not already running
+    if (!timerRef.current) {
+      // Wait for agents to reach the table (~10s walk time) before first message
+      const elapsed = Date.now() - discussionStartRef.current;
+      const walkDelay = Math.max(0, 10000 - elapsed);
+      timerRef.current = setTimeout(drainQueue, walkDelay);
+    }
+  }, [conversationLog, drainQueue]);
+
+  // Remove messages older than 15s
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
-      setMessages(prev => prev.filter(m => now - m.createdAt < 12000));
+      setMessages(prev => prev.filter(m => now - m.createdAt < 15000));
     }, 1500);
     return () => clearInterval(interval);
   }, []);
@@ -1606,7 +1641,12 @@ function HabboChatStack({ conversationLog, isDiscussing }: { conversationLog?: C
   useEffect(() => {
     if (!isDiscussing) {
       setMessages([]);
+      queueRef.current = [];
       lastProcessedTurn.current = -1;
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
     }
   }, [isDiscussing]);
 
