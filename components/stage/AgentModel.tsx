@@ -131,6 +131,9 @@ export default function AgentModel({
     // Rendered position (includes steering offset — the true visual position)
     renderedX: position[0],
     renderedZ: position[2],
+    // Smoothed movement direction for rotation (avoids jitter from micro-steering)
+    smoothDirX: 0,
+    smoothDirZ: 0,
     // Remember what state to go to after entire path completes
     postPathState: null as InternalState | null,
   });
@@ -561,11 +564,16 @@ export default function AgentModel({
         // Gentle walk bob (slow frequency, low amplitude)
         groupRef.current.position.y = Math.abs(Math.sin(t * 4)) * 0.015;
 
-        // 11. Rotation based on actual frame-to-frame movement direction
+        // 11. Rotation based on smoothed movement direction (prevents spinning)
         const frameDx = px - b.prevFrameX;
         const frameDz = pz - b.prevFrameZ;
-        if (Math.abs(frameDx) > 0.001 || Math.abs(frameDz) > 0.001) {
-          b.targetRotY = Math.atan2(frameDx, frameDz);
+        // Smooth the direction vector over many frames to filter oscillation
+        b.smoothDirX = b.smoothDirX * 0.85 + frameDx * 0.15;
+        b.smoothDirZ = b.smoothDirZ * 0.85 + frameDz * 0.15;
+        // Only update rotation when there's meaningful sustained movement
+        const smoothDirLen = Math.sqrt(b.smoothDirX * b.smoothDirX + b.smoothDirZ * b.smoothDirZ);
+        if (smoothDirLen > 0.005) {
+          b.targetRotY = Math.atan2(b.smoothDirX, b.smoothDirZ);
         }
         b.prevFrameX = px;
         b.prevFrameZ = pz;
@@ -588,7 +596,7 @@ export default function AgentModel({
         groupRef.current.position.x = mtX;
         groupRef.current.position.z = mtZ;
         groupRef.current.position.y = Math.sin(t * 1.5 + b.bobPhase) * 0.01;
-        const toDx = 3.5 - b.meetingSeat.x;
+        const toDx = 5.5 - b.meetingSeat.x;
         const toDz = 0 - b.meetingSeat.z;
         b.targetRotY = Math.atan2(toDx, toDz);
         groupRef.current.rotation.y = b.currentRotY;

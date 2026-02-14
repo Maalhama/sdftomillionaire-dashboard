@@ -37,7 +37,7 @@ class Room3DErrorBoundary extends Component<{ children: ReactNode }, { hasError:
 }
 
 // ═══ CAMERA DEFAULTS ═══
-const DEFAULT_CAM_POS: [number, number, number] = [8, 14, 8];
+const DEFAULT_CAM_POS: [number, number, number] = [12, 18, 12];
 const DEFAULT_CAM_FOV = 38;
 const DEFAULT_CAM_TARGET = new THREE.Vector3(0, 0, 0);
 
@@ -48,29 +48,29 @@ const DEFAULT_CAM_TARGET = new THREE.Vector3(0, 0, 0);
 const WALL_HEIGHT = 2.5;
 const WALL_COLOR = '#0d0d0d';
 const WALL_EMISSIVE = '#00ff41';
-const FLOOR_SIZE = { w: 14, d: 10 };
+const FLOOR_SIZE = { w: 20, d: 14 };
 
-// Office desk positions (left side, compact 2x3 grid)
+// Office desk positions (left side, spacious 2x3 grid)
 const deskPositions: [number, number, number][] = [
-  [-4.5, 0, -2.5],  // CEO
-  [-4.5, 0, 0],     // KIRA
-  [-4.5, 0, 2.5],   // MADARA
-  [-2, 0, -2.5],    // STARK
-  [-2, 0, 0],       // L
-  [-2, 0, 2.5],     // USOPP
+  [-6.5, 0, -3.5],  // CEO
+  [-6.5, 0, 0],     // KIRA
+  [-6.5, 0, 3.5],   // MADARA
+  [-3.5, 0, -3.5],  // STARK
+  [-3.5, 0, 0],     // L
+  [-3.5, 0, 3.5],   // USOPP
 ];
 
 // Meeting table position (right side)
-const MEETING_TABLE_POS: [number, number, number] = [3.5, 0, 0];
+const MEETING_TABLE_POS: [number, number, number] = [5.5, 0, 0];
 
 // Meeting seat positions around the table
 const meetingSeatPositions: [number, number, number][] = [
-  [3.5, 0, -1.8],   // seat 0 (front)
-  [5, 0, -0.9],     // seat 1
-  [5, 0, 0.9],      // seat 2
-  [3.5, 0, 1.8],    // seat 3 (back)
-  [2, 0, 0.9],      // seat 4
-  [2, 0, -0.9],     // seat 5
+  [5.5, 0, -2.2],   // seat 0 (front)
+  [7.2, 0, -1.1],   // seat 1
+  [7.2, 0, 1.1],    // seat 2
+  [5.5, 0, 2.2],    // seat 3 (back)
+  [3.8, 0, 1.1],    // seat 4
+  [3.8, 0, -1.1],   // seat 5
 ];
 
 // ═══ COLLISION DATA ═══
@@ -86,11 +86,11 @@ const ROOM_BOUNDS = {
   maxZ: FLOOR_SIZE.d / 2 - AGENT_RADIUS,   //  4.6
 };
 
-// Divider wall (x=0.3, door gap at z ∈ [-1.5, 1.5])
-const DIVIDER = { x: 0.3, doorZMin: -1.5, doorZMax: 1.5 };
+// Divider wall (x=-0.5, door gap at z ∈ [-2, 2])
+const DIVIDER = { x: -0.5, doorZMin: -2, doorZMax: 2 };
 
 // Meeting table circle collision (agents can sit around edge but not walk through center)
-const MEETING_TABLE_COLLISION = { x: 3.5, z: 0, radius: 0.9 };
+const MEETING_TABLE_COLLISION = { x: 5.5, z: 0, radius: 1.0 };
 
 // Obstacle AABBs — desks + chairs (padded by agent radius)
 // Each desk: table at [pos.x+0.4, pos.z], size 0.6×0.8, chair at [pos.x-0.3, pos.z]
@@ -128,26 +128,31 @@ const SHARED_POSITIONS = new Float32Array(12);
 // Roam waypoints — positions scattered across both rooms for agents to walk through
 const ROAM_WAYPOINTS: [number, number, number][] = [
   // Office area (left side)
-  [-5.5, 0, -3.5],   // back-left corner
-  [-5.5, 0, 3.5],    // front-left corner
-  [-3.2, 0, -1.2],   // between desk rows top
-  [-3.2, 0, 1.2],    // between desk rows bottom
-  [-1, 0, -3.5],     // right of desks top
-  [-1, 0, 3.5],      // right of desks bottom
-  [-1, 0, 0],        // center right of desks
+  [-8.5, 0, -5.5],   // back-left corner
+  [-8.5, 0, 5.5],    // front-left corner
+  [-5, 0, -1.5],     // between desk rows top
+  [-5, 0, 1.5],      // between desk rows bottom
+  [-1.5, 0, -5],     // right of desks top
+  [-1.5, 0, 5],      // right of desks bottom
+  [-1.5, 0, 0],      // center right of desks
+  [-8, 0, 0],        // far left center
+  [-5, 0, -5],       // office back corridor
+  [-5, 0, 5],        // office front corridor
   // Doorway area
-  [0.3, 0, 0],       // in the door
+  [-0.5, 0, 0],      // in the door
   // Meeting room (right side)
-  [1.5, 0, -3.5],    // meeting room top-left
-  [1.5, 0, 3.5],     // meeting room bottom-left
-  [2.5, 0, -2],      // near table top-left
-  [4.5, 0, -2],      // near table top-right
-  [5.5, 0, 0],       // right of table
-  [4.5, 0, 2],       // near table bottom-right
-  [2.5, 0, 2],       // near table bottom-left
-  [5.5, 0, -3.5],    // meeting room top-right corner
-  [5.5, 0, 3.5],     // meeting room bottom-right corner
+  [1.5, 0, -5],      // meeting room top-left
+  [1.5, 0, 5],       // meeting room bottom-left
+  [3.5, 0, -3],      // near table top-left
+  [7.5, 0, -3],      // near table top-right
+  [8, 0, 0],         // right of table
+  [7.5, 0, 3],       // near table bottom-right
+  [3.5, 0, 3],       // near table bottom-left
+  [8.5, 0, -5.5],    // meeting room top-right corner
+  [8.5, 0, 5.5],     // meeting room bottom-right corner
   [1.5, 0, 0],       // meeting room left center
+  [5.5, 0, 5],       // meeting room far bottom
+  [5.5, 0, -5],      // meeting room far top
 ];
 
 // Agent configs — positions are at their desks
@@ -289,8 +294,8 @@ function RoomWalls() {
 
   // Divider wall between office and meeting room (with gap for door)
   const dividerWalls: [number, number][][] = [
-    [[0.3, -FLOOR_SIZE.d / 2], [0.3, -1.5]],  // divider top part
-    [[0.3, 1.5], [0.3, FLOOR_SIZE.d / 2]],     // divider bottom part
+    [[-0.5, -FLOOR_SIZE.d / 2], [-0.5, -2]],  // divider top part
+    [[-0.5, 2], [-0.5, FLOOR_SIZE.d / 2]],     // divider bottom part
   ];
 
   return (
@@ -719,8 +724,8 @@ function CameraControls({ controlsRef }: { controlsRef: React.RefObject<any> }) 
       ref={controlsRef}
       enablePan={false}
       enableZoom={true}
-      minDistance={10}
-      maxDistance={30}
+      minDistance={14}
+      maxDistance={40}
       maxPolarAngle={Math.PI / 3}
       minPolarAngle={Math.PI / 6}
       autoRotate={false}
@@ -800,14 +805,14 @@ export default function HQRoom3D({ liveAgents }: { liveAgents?: AgentLiveData[] 
         <directionalLight position={[-5, 8, -5]} intensity={0.4} color="#ffffff" />
 
         {/* Colored ambient */}
-        <pointLight position={[-3.5, 3, 0]} intensity={0.3} color="#00d4ff" distance={8} />
-        <pointLight position={[3.5, 3, 0]} intensity={0.3} color="#00ff41" distance={8} />
+        <pointLight position={[-5, 3, 0]} intensity={0.3} color="#00d4ff" distance={12} />
+        <pointLight position={[5.5, 3, 0]} intensity={0.3} color="#00ff41" distance={12} />
 
         {/* Hemisphere */}
         <hemisphereLight args={['#1a2a1a', '#0a0a0a', 0.5]} />
 
         {/* Fog */}
-        <fog attach="fog" args={['#0a0a0a', 20, 40]} />
+        <fog attach="fog" args={['#0a0a0a', 28, 50]} />
 
         <Suspense fallback={null}>
           {/* Room structure */}
@@ -815,8 +820,8 @@ export default function HQRoom3D({ liveAgents }: { liveAgents?: AgentLiveData[] 
           <RoomWalls />
 
           {/* Room labels */}
-          <RoomLabel text="// office_space" position={[-3.2, 2.6, -4.5]} />
-          <RoomLabel text="// meeting_room" position={[3.5, 2.6, -4.5]} />
+          <RoomLabel text="// office_space" position={[-5, 2.6, -6.5]} />
+          <RoomLabel text="// meeting_room" position={[5.5, 2.6, -6.5]} />
 
           {/* Meeting table */}
           <MeetingTable position={MEETING_TABLE_POS} />
