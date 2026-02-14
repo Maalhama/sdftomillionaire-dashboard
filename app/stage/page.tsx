@@ -97,7 +97,7 @@ export default function StagePage() {
         supabase.from('ops_agent_stats').select('*'),
         supabase.from('ops_missions').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
         supabase.from('ops_missions').select('*', { count: 'exact', head: true }),
-        supabase.from('ops_roundtable_queue').select('*').or('status.eq.running,status.eq.pending,status.eq.succeeded').order('created_at', { ascending: false }).limit(1),
+        supabase.from('ops_roundtable_queue').select('*').or('status.eq.running,status.eq.pending,status.eq.succeeded').gte('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString()).order('created_at', { ascending: false }).limit(1),
         supabase.from('user_prompts').select('id, content, status, ai_plan, created_at').in('status', ['winner', 'building', 'completed', 'published']).order('created_at', { ascending: false }).limit(5),
       ]);
 
@@ -175,28 +175,25 @@ export default function StagePage() {
   const getAgentAvatar = (agentId: string) => AGENTS[agentId as AgentId]?.avatar || '/agents/opus.png';
 
   const getAgentStatus = (agentId: string): AgentStatus => {
-    // 1. Roundtable active (running/pending) → discussing
-    if (
-      activeRoundtable &&
-      (activeRoundtable.status === 'running' || activeRoundtable.status === 'pending') &&
-      activeRoundtable.participants.includes(agentId)
-    ) {
-      return 'discussing';
-    }
-
-    // 1b. Roundtable finished recently — keep agents at table for 3 minutes from start
-    // This guarantees all chat bubbles (12s walk + 6 turns * 6s + reading) have time to play
-    if (
-      activeRoundtable &&
-      activeRoundtable.participants.includes(agentId) &&
-      activeRoundtable.conversation_log?.length > 0
-    ) {
-      const startedAt = activeRoundtable.finished_at
-        ? new Date(activeRoundtable.finished_at).getTime()
-        : new Date(activeRoundtable.created_at).getTime();
-      // 3 minutes from finish (or creation) — ultra generous
-      if (Date.now() < startedAt + 180000) {
+    if (activeRoundtable && activeRoundtable.participants.includes(agentId)) {
+      // 1a. Roundtable running or pending → discussing (agents at table)
+      if (activeRoundtable.status === 'running' || activeRoundtable.status === 'pending') {
         return 'discussing';
+      }
+
+      // 1b. Roundtable just finished — keep agents at table for 90s after finish
+      // So all messages are visible and users can read them
+      if (
+        (activeRoundtable.status === 'succeeded' || activeRoundtable.status === 'failed') &&
+        activeRoundtable.conversation_log?.length > 0
+      ) {
+        // Use finished_at if available, otherwise created_at + 5min as fallback
+        const endTime = activeRoundtable.finished_at
+          ? new Date(activeRoundtable.finished_at).getTime()
+          : new Date(activeRoundtable.created_at).getTime() + 300000;
+        if (Date.now() < endTime + 90000) {
+          return 'discussing';
+        }
       }
     }
 

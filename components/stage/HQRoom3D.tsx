@@ -1582,93 +1582,55 @@ interface ActiveBubble {
   createdAt: number;
 }
 
-// ── Habbo-style stacked chat log above the meeting table ──
-// Messages stack like Lego — new message appears at bottom, pushes all previous ones up
-// All messages remain visible as a conversation thread
+// ── Habbo-style stacked chat — REAL-TIME from Supabase ──
+// Messages appear INSTANTLY as the worker writes each turn
+// Stack like Lego blocks — new at bottom, pushes previous up
 function HabboChatController({ conversationLog, isDiscussing }: { conversationLog?: ConversationTurn[]; isDiscussing: boolean }) {
   const [messages, setMessages] = useState<(ActiveBubble & { shownAt: number })[]>([]);
   const lastProcessedTurn = useRef(-1);
-  const queueRef = useRef<ActiveBubble[]>([]);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const discussionStartRef = useRef<number>(0);
-  const chatActiveRef = useRef(false);
 
-  // Track discussion start
-  useEffect(() => {
-    if (isDiscussing && discussionStartRef.current === 0) {
-      discussionStartRef.current = Date.now();
-    }
-  }, [isDiscussing]);
-
-  // Show next message from queue
-  const showNext = useCallback(() => {
-    if (queueRef.current.length === 0) {
-      timerRef.current = null;
-      chatActiveRef.current = false;
-      return;
-    }
-    chatActiveRef.current = true;
-    const next = queueRef.current.shift()!;
-    next.createdAt = Date.now();
-
-    setMessages(prev => [...prev, { ...next, shownAt: Date.now() }]);
-
-    // 6s between each message — comfortable reading pace
-    timerRef.current = setTimeout(showNext, 6000);
-  }, []);
-
-  // Queue new turns
+  // Show messages IMMEDIATELY as they arrive from Supabase realtime
   useEffect(() => {
     if (!conversationLog || conversationLog.length === 0) return;
 
     const newTurns = conversationLog.filter(t => t.turn > lastProcessedTurn.current);
     if (newTurns.length === 0) return;
 
-    for (const t of newTurns) {
+    const newMessages = newTurns.map(t => {
       lastProcessedTurn.current = t.turn;
       const agentIdx = SPEAKER_TO_INDEX[t.speaker] ?? 0;
       const seatPos = meetingSeatPositions[agentIdx] || meetingSeatPositions[0];
-      queueRef.current.push({
+      return {
         id: t.turn,
         speaker: t.speaker,
         displayName: SPEAKER_DISPLAY[t.speaker] || t.speaker,
         text: t.dialogue || t.message || '',
         color: SPEAKER_COLORS[t.speaker] || '#00ff41',
         seatPos,
-        createdAt: 0,
-      });
-    }
+        createdAt: Date.now(),
+        shownAt: Date.now(),
+      };
+    });
 
-    // Start drain — wait for agents to reach the table first
-    if (!timerRef.current) {
-      const elapsed = Date.now() - discussionStartRef.current;
-      const walkDelay = Math.max(0, 12000 - elapsed);
-      timerRef.current = setTimeout(showNext, walkDelay);
-    }
-  }, [conversationLog, showNext]);
+    setMessages(prev => [...prev, ...newMessages]);
+  }, [conversationLog]);
 
-  // Reset ONLY when discussion ends AND no messages are queued AND chat is done
+  // Clear only after discussion fully ends + 30s reading buffer
   useEffect(() => {
-    if (!isDiscussing && !chatActiveRef.current && queueRef.current.length === 0) {
-      // Wait a bit before clearing so user can read the last messages
+    if (!isDiscussing && messages.length > 0) {
       const timeout = setTimeout(() => {
         setMessages([]);
         lastProcessedTurn.current = -1;
-        discussionStartRef.current = 0;
-      }, 15000);
+      }, 30000);
       return () => clearTimeout(timeout);
     }
-  }, [isDiscussing]);
+  }, [isDiscussing, messages.length]);
 
   if (messages.length === 0) return null;
 
-  // The stack: newest message at bottom, all stacked vertically above the table
-  const BAR_HEIGHT = 38; // approx height of one message bar in px
-  const GAP = 4;
-
   return (
     <Html
-      position={[7, 4.5, 0]}
+      position={[7, 5.0, 0]}
       center
       style={{ pointerEvents: 'none' }}
     >
@@ -1678,8 +1640,8 @@ function HabboChatController({ conversationLog, isDiscussing }: { conversationLo
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: `${GAP}px`,
-          width: '800px',
+          gap: '3px',
+          width: '900px',
         }}
       >
         {messages.map((msg, idx) => {
@@ -1689,8 +1651,8 @@ function HabboChatController({ conversationLog, isDiscussing }: { conversationLo
               key={`habbo-${msg.id}`}
               style={{
                 width: '100%',
-                animation: isNewest ? 'habboSlideUp 0.4s ease-out' : undefined,
-                zIndex: idx + 1, // newest at front
+                animation: isNewest ? 'habboSlideUp 0.35s ease-out' : undefined,
+                zIndex: idx + 1,
                 position: 'relative',
               }}
             >
@@ -1699,7 +1661,7 @@ function HabboChatController({ conversationLog, isDiscussing }: { conversationLo
                 style={{
                   background: 'rgba(11, 11, 11, 0.92)',
                   borderRadius: '3px',
-                  padding: '6px 14px',
+                  padding: '6px 16px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '10px',
@@ -2104,7 +2066,34 @@ export default function HQRoom3D({ liveAgents, conversationLog }: { liveAgents?:
             />
           ))}
 
-          {/* ── Habbo Chat — bubbles appear above each speaking agent ── */}
+          {/* ── "!" at center of table when agents are gathering ── */}
+          {mergedConfigs.some(c => c.status === 'discussing') && (!conversationLog || conversationLog.length === 0) && (
+            <Html position={[7, 3.5, 0]} center style={{ pointerEvents: 'none' }}>
+              <div className="select-none" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: '#ef4444',
+                    border: '3px solid #f59e0b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 0 16px rgba(245, 158, 11, 0.7), 0 0 30px rgba(239, 68, 68, 0.4)',
+                    animation: 'questBounce 0.8s ease-in-out infinite',
+                  }}
+                >
+                  <span style={{ color: '#fff', fontSize: '20px', fontWeight: 900, lineHeight: 1, textShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>!</span>
+                </div>
+                <span className="font-mono" style={{ fontSize: '9px', color: '#f59e0b', marginTop: '4px', textShadow: '0 0 6px rgba(245,158,11,0.5)' }}>
+                  ROUNDTABLE
+                </span>
+              </div>
+            </Html>
+          )}
+
+          {/* ── Habbo Chat — real-time stacked messages ── */}
           <HabboChatController
             conversationLog={conversationLog}
             isDiscussing={mergedConfigs.some(c => c.status === 'discussing')}
