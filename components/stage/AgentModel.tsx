@@ -98,8 +98,8 @@ export default function AgentModel({
   const groupRef = useRef<THREE.Group>(null);
   const { scene } = useGLTF(modelPath);
 
-  // Walk speed varies per agent (1.5 to 2.0, seeded by agentIndex)
-  const walkSpeed = useMemo(() => 1.5 + (agentIndex * 0.1) % 0.5, [agentIndex]);
+  // Walk speed varies per agent (0.7 to 0.9, slow calm pace)
+  const walkSpeed = useMemo(() => 0.7 + (agentIndex * 0.035) % 0.2, [agentIndex]);
 
   const behaviorRef = useRef({
     internalState: 'idle' as InternalState,
@@ -331,12 +331,11 @@ export default function AgentModel({
     }
 
     const progress = Math.min(b.stateTimer / b.stateDuration, 1);
-    const ease = progress < 0.5
-      ? 2 * progress * progress
-      : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+    // Gentle sine ease — smooth start and stop, no abrupt acceleration
+    const ease = -(Math.cos(Math.PI * progress) - 1) / 2;
 
-    // Smooth rotation
-    b.currentRotY = THREE.MathUtils.lerp(b.currentRotY, b.targetRotY, 0.05);
+    // Smooth rotation (slow turn for fluid feel)
+    b.currentRotY = THREE.MathUtils.lerp(b.currentRotY, b.targetRotY, 0.03);
 
     switch (b.internalState) {
       case 'idle': {
@@ -379,8 +378,8 @@ export default function AgentModel({
         const ndx = segLen > 0.01 ? segDx / segLen : 0;
         const ndz = segLen > 0.01 ? segDz / segLen : 0;
 
-        // 3. Look-ahead point
-        const lookDist = 1.2;
+        // 3. Look-ahead point (further ahead for earlier avoidance)
+        const lookDist = 1.8;
         const laX = px + ndx * lookDist;
         const laZ = pz + ndz * lookDist;
 
@@ -440,34 +439,26 @@ export default function AgentModel({
             }
           }
 
-          // 6. Agent avoidance (only agents ahead of us)
+          // 6. Agent avoidance — omnidirectional, strong separation
           for (let i = 0; i < totalAgents; i++) {
             if (i === agentIndex) continue;
             const ox = sharedPositions[i * 2];
             const oz = sharedPositions[i * 2 + 1];
-            const toDx = ox - px;
-            const toDz = oz - pz;
-            const dist = Math.sqrt(toDx * toDx + toDz * toDz);
-            if (dist < 1.5 && dist > 0.001) {
-              // Dot product: is this agent in front of us?
-              const dot = ndx * toDx + ndz * toDz;
-              if (dot > -0.3) {
-                // Steer away perpendicular to walk direction
-                const awayX = px - ox;
-                const awayZ = pz - oz;
-                const awayLen = Math.sqrt(awayX * awayX + awayZ * awayZ);
-                if (awayLen > 0.01) {
-                  const strength = (1.5 - dist) / 1.5 * 0.6;
-                  avoidX += (awayX / awayLen) * strength;
-                  avoidZ += (awayZ / awayLen) * strength;
-                }
-              }
+            const awayX = px - ox;
+            const awayZ = pz - oz;
+            const dist = Math.sqrt(awayX * awayX + awayZ * awayZ);
+            if (dist < 2.0 && dist > 0.001) {
+              // Stronger force the closer they are (quadratic falloff)
+              const t01 = (2.0 - dist) / 2.0;
+              const strength = t01 * t01 * 1.2;
+              avoidX += (awayX / dist) * strength;
+              avoidZ += (awayZ / dist) * strength;
             }
           }
         }
 
-        // 7. Smooth the avoidance force (lerp toward target)
-        const lerpRate = 0.1;
+        // 7. Smooth the avoidance force (gentle lerp for fluid curves)
+        const lerpRate = 0.06;
         b.smoothAvoidX = b.smoothAvoidX + (avoidX - b.smoothAvoidX) * lerpRate;
         b.smoothAvoidZ = b.smoothAvoidZ + (avoidZ - b.smoothAvoidZ) * lerpRate;
 
@@ -531,7 +522,8 @@ export default function AgentModel({
 
         groupRef.current.position.x = px;
         groupRef.current.position.z = pz;
-        groupRef.current.position.y = Math.abs(Math.sin(t * 8)) * 0.035;
+        // Gentle walk bob (slow frequency, low amplitude)
+        groupRef.current.position.y = Math.abs(Math.sin(t * 4)) * 0.015;
 
         // 10. Rotation based on actual frame-to-frame movement direction
         const frameDx = px - b.prevFrameX;
@@ -543,7 +535,8 @@ export default function AgentModel({
         b.prevFrameZ = pz;
 
         groupRef.current.rotation.y = b.currentRotY;
-        groupRef.current.rotation.z = Math.sin(t * 6) * 0.03;
+        // Subtle body sway while walking
+        groupRef.current.rotation.z = Math.sin(t * 3) * 0.015;
         groupRef.current.rotation.x = 0;
         groupRef.current.scale.set(scale, scale, scale);
         b.currentPos.set(px, 0, pz);
