@@ -99,8 +99,8 @@ const meetingSeatPositions: [number, number, number][] = [
 
 // ═══ GLASS PARTITION ═══
 const PARTITION_X = 1.5;
-const DOOR_Z_MIN = -2.0;
-const DOOR_Z_MAX = 2.0;
+const DOOR_Z_MIN = -3.5;
+const DOOR_Z_MAX = 3.5;
 
 // ═══ COLLISION DATA ═══
 const AGENT_RADIUS = 0.4;
@@ -714,6 +714,246 @@ function CoffeeStation({ position }: { position: [number, number, number] }) {
   );
 }
 
+// Wall-mounted TV/monitor screen
+function WallScreen({ position, rotation = [0, 0, 0], color = '#00ff41' }: {
+  position: [number, number, number];
+  rotation?: [number, number, number];
+  color?: string;
+}) {
+  return (
+    <group position={position} rotation={rotation.map(r => r * Math.PI / 180) as unknown as THREE.Euler}>
+      {/* Bezel */}
+      <mesh>
+        <boxGeometry args={[1.6, 0.9, 0.04]} />
+        <meshStandardMaterial color="#0a0a0a" metalness={0.5} />
+      </mesh>
+      {/* Screen */}
+      <mesh position={[0, 0, 0.025]}>
+        <boxGeometry args={[1.45, 0.78, 0.01]} />
+        <meshStandardMaterial color="#020a02" emissive={color} emissiveIntensity={0.12} />
+      </mesh>
+      {/* Screen glow */}
+      <pointLight position={[0, 0, 0.3]} color={color} intensity={0.2} distance={3} />
+    </group>
+  );
+}
+
+// Water cooler
+function WaterCooler({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      {/* Base */}
+      <mesh position={[0, 0.35, 0]}>
+        <boxGeometry args={[0.35, 0.7, 0.35]} />
+        <meshStandardMaterial color="#1a1a1a" metalness={0.3} />
+      </mesh>
+      {/* Water bottle */}
+      <mesh position={[0, 0.9, 0]}>
+        <cylinderGeometry args={[0.12, 0.12, 0.5, 12]} />
+        <meshPhysicalMaterial color="#0a2a3a" transparent opacity={0.4} roughness={0.1} />
+      </mesh>
+      {/* Cap */}
+      <mesh position={[0, 1.16, 0]}>
+        <cylinderGeometry args={[0.13, 0.12, 0.03, 12]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+      {/* Status LED */}
+      <pointLight position={[0.18, 0.55, 0.18]} color="#00ff41" intensity={0.05} distance={0.5} />
+    </group>
+  );
+}
+
+// Coat rack
+function CoatRack({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      {/* Pole */}
+      <mesh position={[0, 0.9, 0]}>
+        <cylinderGeometry args={[0.025, 0.025, 1.8, 8]} />
+        <meshStandardMaterial color="#222" metalness={0.6} />
+      </mesh>
+      {/* Base */}
+      <mesh position={[0, 0.02, 0]}>
+        <cylinderGeometry args={[0.2, 0.2, 0.04, 6]} />
+        <meshStandardMaterial color="#1a1a1a" metalness={0.5} />
+      </mesh>
+      {/* Hooks */}
+      {[0, 1, 2, 3].map(i => {
+        const angle = (i * Math.PI) / 2;
+        return (
+          <mesh key={i} position={[Math.cos(angle) * 0.15, 1.7, Math.sin(angle) * 0.15]} rotation={[0, -angle, Math.PI / 4]}>
+            <cylinderGeometry args={[0.01, 0.01, 0.12, 6]} />
+            <meshStandardMaterial color="#333" metalness={0.6} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+// Lounge sofa (2-seater)
+function Sofa({ position, rotation = [0, 0, 0] }: {
+  position: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  return (
+    <group position={position} rotation={rotation.map(r => r * Math.PI / 180) as unknown as THREE.Euler}>
+      {/* Seat */}
+      <mesh position={[0, 0.25, 0]}>
+        <boxGeometry args={[1.4, 0.2, 0.6]} />
+        <meshStandardMaterial color="#0d0d0d" roughness={0.9} />
+      </mesh>
+      {/* Back */}
+      <mesh position={[0, 0.5, -0.25]}>
+        <boxGeometry args={[1.4, 0.4, 0.1]} />
+        <meshStandardMaterial color="#0d0d0d" roughness={0.9} />
+      </mesh>
+      {/* Armrests */}
+      {[-1, 1].map((side, i) => (
+        <mesh key={i} position={[side * 0.65, 0.38, 0]}>
+          <boxGeometry args={[0.1, 0.25, 0.6]} />
+          <meshStandardMaterial color="#0d0d0d" roughness={0.9} />
+        </mesh>
+      ))}
+      {/* Legs */}
+      {[[-0.55, 0.07, 0.2], [0.55, 0.07, 0.2], [-0.55, 0.07, -0.2], [0.55, 0.07, -0.2]].map((pos, i) => (
+        <mesh key={`leg-${i}`} position={pos as [number, number, number]}>
+          <cylinderGeometry args={[0.025, 0.025, 0.14, 6]} />
+          <meshStandardMaterial color="#222" metalness={0.5} />
+        </mesh>
+      ))}
+      {/* Cushion accent line */}
+      <mesh position={[0, 0.36, 0.1]}>
+        <boxGeometry args={[1.2, 0.01, 0.02]} />
+        <meshBasicMaterial color="#00ff41" transparent opacity={0.15} />
+      </mesh>
+    </group>
+  );
+}
+
+// Floor rug (rectangular glow mat)
+function Rug({ position, size = [2, 3], color = '#00ff41' }: {
+  position: [number, number, number];
+  size?: [number, number];
+  color?: string;
+}) {
+  return (
+    <group position={position}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
+        <planeGeometry args={size} />
+        <meshStandardMaterial color="#0a0a0a" emissive={color} emissiveIntensity={0.015} />
+      </mesh>
+      {/* Border */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
+        <ringGeometry args={[Math.min(size[0], size[1]) * 0.48, Math.min(size[0], size[1]) * 0.5, 4]} />
+        <meshBasicMaterial color={color} transparent opacity={0.08} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
+  );
+}
+
+// Server rack / mini rack
+function ServerRack({ position, rotation = [0, 0, 0] }: {
+  position: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  return (
+    <group position={position} rotation={rotation.map(r => r * Math.PI / 180) as unknown as THREE.Euler}>
+      {/* Rack body */}
+      <mesh position={[0, 0.8, 0]}>
+        <boxGeometry args={[0.6, 1.6, 0.4]} />
+        <meshStandardMaterial color="#0a0a0a" metalness={0.4} />
+      </mesh>
+      {/* Front panel lines */}
+      {[0.3, 0.6, 0.9, 1.2].map((y, i) => (
+        <mesh key={i} position={[0, y, 0.21]}>
+          <boxGeometry args={[0.5, 0.15, 0.01]} />
+          <meshStandardMaterial color="#111" emissive="#00ff41" emissiveIntensity={0.03} />
+        </mesh>
+      ))}
+      {/* Status LEDs */}
+      {[0.35, 0.65, 0.95, 1.25].map((y, i) => (
+        <pointLight key={`led-${i}`} position={[0.25, y, 0.22]} color={i % 2 === 0 ? '#00ff41' : '#00aaff'} intensity={0.03} distance={0.5} />
+      ))}
+    </group>
+  );
+}
+
+// Wall poster / frame
+function WallPoster({ position, rotation = [0, 0, 0], color = '#00ff41' }: {
+  position: [number, number, number];
+  rotation?: [number, number, number];
+  color?: string;
+}) {
+  return (
+    <group position={position} rotation={rotation.map(r => r * Math.PI / 180) as unknown as THREE.Euler}>
+      {/* Frame */}
+      <mesh>
+        <boxGeometry args={[0.6, 0.8, 0.02]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+      {/* Art */}
+      <mesh position={[0, 0, 0.015]}>
+        <boxGeometry args={[0.5, 0.7, 0.005]} />
+        <meshStandardMaterial color="#050505" emissive={color} emissiveIntensity={0.06} />
+      </mesh>
+    </group>
+  );
+}
+
+// Wall clock
+function WallClock({ position, rotation = [0, 0, 0] }: {
+  position: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  return (
+    <group position={position} rotation={rotation.map(r => r * Math.PI / 180) as unknown as THREE.Euler}>
+      {/* Clock face */}
+      <mesh>
+        <cylinderGeometry args={[0.25, 0.25, 0.03, 24]} />
+        <meshStandardMaterial color="#111" />
+      </mesh>
+      {/* Rim */}
+      <mesh>
+        <torusGeometry args={[0.25, 0.015, 8, 24]} />
+        <meshStandardMaterial color="#222" metalness={0.6} />
+      </mesh>
+      {/* Center dot */}
+      <mesh position={[0, 0, 0.02]}>
+        <cylinderGeometry args={[0.02, 0.02, 0.01, 8]} />
+        <meshBasicMaterial color="#00ff41" />
+      </mesh>
+      {/* Hour marks */}
+      {Array.from({ length: 12 }).map((_, i) => {
+        const angle = (i * Math.PI * 2) / 12;
+        return (
+          <mesh key={i} position={[Math.sin(angle) * 0.2, Math.cos(angle) * 0.2, 0.02]}>
+            <boxGeometry args={[0.01, 0.04, 0.005]} />
+            <meshBasicMaterial color="#00ff41" transparent opacity={0.5} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+// Trash bin
+function TrashBin({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      <mesh position={[0, 0.2, 0]}>
+        <cylinderGeometry args={[0.13, 0.1, 0.4, 10]} />
+        <meshStandardMaterial color="#1a1a1a" metalness={0.3} />
+      </mesh>
+      {/* Rim */}
+      <mesh position={[0, 0.4, 0]}>
+        <torusGeometry args={[0.13, 0.01, 6, 10]} />
+        <meshStandardMaterial color="#222" metalness={0.5} />
+      </mesh>
+    </group>
+  );
+}
+
 // Ceiling strip light
 function CeilingLight({ position, length, axis = 'x' }: {
   position: [number, number, number];
@@ -733,7 +973,7 @@ function CeilingLight({ position, length, axis = 'x' }: {
         <meshBasicMaterial color="#ccddcc" transparent opacity={0.6} />
       </mesh>
       {/* Actual light */}
-      <pointLight position={[0, -0.1, 0]} color="#ddeedd" intensity={0.6} distance={6} />
+      <pointLight position={[0, -0.1, 0]} color="#eeffee" intensity={1.2} distance={10} />
     </group>
   );
 }
@@ -757,7 +997,7 @@ function RoomFloor() {
       {/* Dark floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
         <planeGeometry args={[FLOOR_SIZE.w, FLOOR_SIZE.d]} />
-        <meshStandardMaterial color="#060606" roughness={0.8} />
+        <meshStandardMaterial color="#0c0c0c" roughness={0.6} metalness={0.1} />
       </mesh>
       {/* Ceiling */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, WALL_HEIGHT, 0]}>
@@ -1100,17 +1340,26 @@ export default function HQRoom3D({ liveAgents }: { liveAgents?: AgentLiveData[] 
         style={{ background: 'transparent' }}
         orthographic={false}
       >
-        {/* ── Lighting ── */}
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[8, 14, 6]} intensity={0.9} color="#ffffff" />
-        <directionalLight position={[-6, 10, -4]} intensity={0.3} color="#ffffff" />
+        {/* ── Lighting — bright office ── */}
+        <ambientLight intensity={1.2} />
+        <directionalLight position={[8, 14, 6]} intensity={1.5} color="#ffffff" />
+        <directionalLight position={[-8, 12, -6]} intensity={0.8} color="#ffffff" />
+        <directionalLight position={[0, 16, 0]} intensity={0.6} color="#eeffee" />
 
-        {/* Colored ambient fills */}
-        <pointLight position={[-7, 4, 0]} intensity={0.25} color="#00d4ff" distance={14} />
-        <pointLight position={[7, 4, 0]} intensity={0.25} color="#00ff41" distance={14} />
+        {/* Colored ambient fills — workspace & conference */}
+        <pointLight position={[-7, 5, -5]} intensity={0.6} color="#00d4ff" distance={16} />
+        <pointLight position={[-7, 5,  5]} intensity={0.6} color="#00d4ff" distance={16} />
+        <pointLight position={[-7, 5,  0]} intensity={0.5} color="#00d4ff" distance={16} />
+        <pointLight position={[7, 5, -4]} intensity={0.5} color="#00ff41" distance={16} />
+        <pointLight position={[7, 5,  4]} intensity={0.5} color="#00ff41" distance={16} />
+        <pointLight position={[7, 5,  0]} intensity={0.5} color="#00ff41" distance={16} />
 
-        <hemisphereLight args={['#1a2a1a', '#0a0a0a', 0.4]} />
-        <fog attach="fog" args={['#0a0a0a', 32, 55]} />
+        {/* Floor fill lights — prevent dark floor */}
+        <pointLight position={[-6, 1.5, 0]} intensity={0.4} color="#ffffff" distance={10} />
+        <pointLight position={[6, 1.5, 0]} intensity={0.4} color="#ffffff" distance={10} />
+
+        <hemisphereLight args={['#2a3a2a', '#1a1a1a', 0.8]} />
+        <fog attach="fog" args={['#0a0a0a', 40, 65]} />
 
         <Suspense fallback={null}>
           {/* ── Room structure ── */}
@@ -1118,11 +1367,18 @@ export default function HQRoom3D({ liveAgents }: { liveAgents?: AgentLiveData[] 
           <RoomWalls />
           <GlassPartition />
 
-          {/* ── Ceiling lights ── */}
-          <CeilingLight position={[-6.5, WALL_HEIGHT - 0.05, -5]} length={4} axis="x" />
-          <CeilingLight position={[-6.5, WALL_HEIGHT - 0.05,  0]} length={4} axis="x" />
-          <CeilingLight position={[-6.5, WALL_HEIGHT - 0.05,  5]} length={4} axis="x" />
-          <CeilingLight position={[7, WALL_HEIGHT - 0.05, 0]} length={4} axis="x" />
+          {/* ── Ceiling lights (workspace — 2 rows) ── */}
+          <CeilingLight position={[-9, WALL_HEIGHT - 0.05, -5]} length={4} axis="x" />
+          <CeilingLight position={[-9, WALL_HEIGHT - 0.05,  0]} length={4} axis="x" />
+          <CeilingLight position={[-9, WALL_HEIGHT - 0.05,  5]} length={4} axis="x" />
+          <CeilingLight position={[-4, WALL_HEIGHT - 0.05, -5]} length={4} axis="x" />
+          <CeilingLight position={[-4, WALL_HEIGHT - 0.05,  0]} length={4} axis="x" />
+          <CeilingLight position={[-4, WALL_HEIGHT - 0.05,  5]} length={4} axis="x" />
+          {/* Corridor light */}
+          <CeilingLight position={[-1, WALL_HEIGHT - 0.05,  0]} length={6} axis="z" />
+          {/* Conference room — 2 lights */}
+          <CeilingLight position={[5, WALL_HEIGHT - 0.05, 0]} length={4} axis="x" />
+          <CeilingLight position={[9, WALL_HEIGHT - 0.05, 0]} length={4} axis="x" />
 
           {/* ── Room labels ── */}
           <RoomLabel text="// workspace" position={[-6.5, WALL_HEIGHT + 0.1, -FLOOR_SIZE.d / 2 + 0.3]} />
@@ -1149,26 +1405,60 @@ export default function HQRoom3D({ liveAgents }: { liveAgents?: AgentLiveData[] 
           <ConferenceTable position={MEETING_TABLE_POS} />
 
           {/* ── Decorations ── */}
-          {/* Plants */}
+
+          {/* Plants — corners and corridors */}
           <Plant position={[-11.5, 0, -7.5]} size={1.2} />
           <Plant position={[-11.5, 0,  7.5]} size={1.0} />
           <Plant position={[11.5, 0, -7.5]} size={1.1} />
           <Plant position={[11.5, 0,  7.5]} size={0.9} />
           <Plant position={[-2, 0, -7.5]} size={0.8} />
           <Plant position={[-2, 0,  7.5]} size={0.8} />
+          <Plant position={[3, 0, -7]} size={0.7} />
+          <Plant position={[3, 0,  7]} size={0.7} />
+          <Plant position={[-11, 0, 0]} size={0.6} />
 
-          {/* Whiteboard on workspace back wall */}
+          {/* Whiteboards */}
           <Whiteboard position={[-6.5, 1.8, -FLOOR_SIZE.d / 2 + 0.1]} />
-
-          {/* Bookshelf on left wall */}
-          <Bookshelf position={[-FLOOR_SIZE.w / 2 + 0.2, 0, -2]} rotation={[0, 90, 0]} />
-          <Bookshelf position={[-FLOOR_SIZE.w / 2 + 0.2, 0,  2]} rotation={[0, 90, 0]} />
-
-          {/* Coffee station */}
-          <CoffeeStation position={[-2, 0, 7]} />
-
-          {/* Conference room whiteboard on right wall */}
           <Whiteboard position={[FLOOR_SIZE.w / 2 - 0.1, 1.8, 0]} rotation={[0, -90, 0]} />
+
+          {/* Bookshelves on left wall */}
+          <Bookshelf position={[-FLOOR_SIZE.w / 2 + 0.2, 0, -5]} rotation={[0, 90, 0]} />
+          <Bookshelf position={[-FLOOR_SIZE.w / 2 + 0.2, 0,  0]} rotation={[0, 90, 0]} />
+          <Bookshelf position={[-FLOOR_SIZE.w / 2 + 0.2, 0,  5]} rotation={[0, 90, 0]} />
+
+          {/* Coffee station + water cooler */}
+          <CoffeeStation position={[-2, 0, 7]} />
+          <WaterCooler position={[-3, 0, 7.5]} />
+
+          {/* TV screens — workspace + conference */}
+          <WallScreen position={[-3, 2, -FLOOR_SIZE.d / 2 + 0.1]} color="#00d4ff" />
+          <WallScreen position={[7, 2, -FLOOR_SIZE.d / 2 + 0.1]} color="#00ff41" />
+
+          {/* Coat rack near entrance */}
+          <CoatRack position={[0.5, 0, -5]} />
+
+          {/* Lounge area — sofa + rug in conference back */}
+          <Sofa position={[10, 0, 6]} rotation={[0, -90, 0]} />
+          <Sofa position={[10, 0, -6]} rotation={[0, -90, 0]} />
+          <Rug position={[10, 0, 6]} size={[2, 2.5]} color="#00ff41" />
+          <Rug position={[10, 0, -6]} size={[2, 2.5]} color="#00aaff" />
+
+          {/* Server rack near partition */}
+          <ServerRack position={[0.5, 0, 7]} rotation={[0, -90, 0]} />
+
+          {/* Wall posters — workspace walls */}
+          <WallPoster position={[-10, 1.8, -FLOOR_SIZE.d / 2 + 0.1]} color="#f59e0b" />
+          <WallPoster position={[-3.5, 1.8, -FLOOR_SIZE.d / 2 + 0.1]} color="#8b5cf6" />
+          <WallPoster position={[FLOOR_SIZE.w / 2 - 0.1, 1.8, -4]} rotation={[0, -90, 0]} color="#ec4899" />
+          <WallPoster position={[FLOOR_SIZE.w / 2 - 0.1, 1.8,  4]} rotation={[0, -90, 0]} color="#3b82f6" />
+
+          {/* Wall clock — workspace front wall */}
+          <WallClock position={[-6.5, 2.2, FLOOR_SIZE.d / 2 - 0.1]} rotation={[90, 0, 0]} />
+
+          {/* Trash bins near desks */}
+          <TrashBin position={[-3.5, 0, -5]} />
+          <TrashBin position={[-3.5, 0,  5]} />
+          <TrashBin position={[4, 0, 2.5]} />
 
           {/* ── Agents ── */}
           {mergedConfigs.map((config, index) => (
