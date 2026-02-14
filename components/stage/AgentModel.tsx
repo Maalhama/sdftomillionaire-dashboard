@@ -59,6 +59,7 @@ function planPath(
   from: THREE.Vector3,
   to: THREE.Vector3,
   collisionData: CollisionData | undefined,
+  agentIndex: number = 0,
 ): THREE.Vector3[] {
   if (!collisionData) return [to.clone()];
 
@@ -68,15 +69,18 @@ function planPath(
 
   if (fromSide === toSide) return [to.clone()];
 
-  // Use agent's current Z to pick a natural crossing point within the door
-  // Clamp to door bounds with padding so agents spread across the full opening
+  // Spread agents across different Z positions in the door opening
+  // Each agent gets a unique lane based on their index
+  const doorWidth = div.doorZMax - div.doorZMin;
   const doorPad = 0.6;
-  const clampedZ = Math.max(div.doorZMin + doorPad, Math.min(div.doorZMax - doorPad, from.z));
+  const usableWidth = doorWidth - doorPad * 2;
+  const laneCount = 6;
+  const laneZ = div.doorZMin + doorPad + (usableWidth / (laneCount + 1)) * (agentIndex + 1);
   const approachOffset = 0.8;
 
   return [
-    new THREE.Vector3(div.x + fromSide * approachOffset, 0, clampedZ),
-    new THREE.Vector3(div.x + toSide * approachOffset, 0, clampedZ),
+    new THREE.Vector3(div.x + fromSide * approachOffset, 0, laneZ),
+    new THREE.Vector3(div.x + toSide * approachOffset, 0, laneZ),
     to.clone(),
   ];
 }
@@ -166,7 +170,7 @@ export default function AgentModel({
   const startPath = (targetX: number, targetZ: number, walkState: InternalState) => {
     const from = new THREE.Vector3(b.px, 0, b.pz);
     const to = new THREE.Vector3(targetX, 0, targetZ);
-    const path = planPath(from, to, collisionData);
+    const path = planPath(from, to, collisionData, agentIndex);
     b.path = path;
     b.pathIndex = 0;
     b.segTargetX = path[0].x;
@@ -406,10 +410,11 @@ export default function AgentModel({
             }
           }
 
-          // Agent avoidance — omnidirectional (reduced near doorway)
+          // Agent avoidance — omnidirectional (much weaker when walking to meeting near door)
+          const isWalkingToMeeting = b.internalState === 'walking-to-meeting';
           const inDoorZone = Math.abs(b.px - collisionData.divider.x) < 2.5
             && b.pz > collisionData.divider.doorZMin && b.pz < collisionData.divider.doorZMax;
-          const agentAvoidStr = inDoorZone ? 0.8 : 2.5; // weaker near door so agents can pass
+          const agentAvoidStr = (isWalkingToMeeting && inDoorZone) ? 0.3 : inDoorZone ? 0.8 : 2.5;
           for (let i = 0; i < totalAgents; i++) {
             if (i === agentIndex) continue;
             const ox = sharedPositions[i * 2];
@@ -425,10 +430,10 @@ export default function AgentModel({
             }
           }
 
-          // Divider wall avoidance
+          // Divider wall avoidance (disabled when walking to meeting — path already routes through door)
           const div = collisionData.divider;
           const inDoor = b.pz > div.doorZMin && b.pz < div.doorZMax;
-          if (!inDoor) {
+          if (!inDoor && !isWalkingToMeeting) {
             const wallPad = collisionData.agentRadius + 0.2;
             if (b.lastSideOfDivider < 0) {
               const pen = b.px - (div.x - wallPad);
