@@ -4,7 +4,7 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
-import type { AgentStatus } from './HQRoom3D';
+import type { AgentStatus, CollisionData } from './HQRoom3D';
 
 useGLTF.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
 
@@ -20,7 +20,7 @@ type InternalState =
   | 'pausing-at-waypoint'
   | 'returning-to-desk';
 
-// Fisher-Yates shuffle (deterministic per call)
+// Fisher-Yates shuffle
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -41,9 +41,9 @@ interface AgentModelProps {
   meetingPositions?: [number, number, number][];
   roamWaypoints?: [number, number, number][];
   agentIndex?: number;
-  onClick?: () => void;
-  onPointerOver?: () => void;
-  onPointerOut?: () => void;
+  collisionData?: CollisionData;
+  sharedPositions?: Float32Array;
+  totalAgents?: number;
 }
 
 export default function AgentModel({
@@ -56,6 +56,9 @@ export default function AgentModel({
   meetingPositions = [],
   roamWaypoints = [],
   agentIndex = 0,
+  collisionData,
+  sharedPositions,
+  totalAgents = 6,
 }: AgentModelProps) {
   const groupRef = useRef<THREE.Group>(null);
   const { scene } = useGLTF(modelPath);
@@ -79,7 +82,9 @@ export default function AgentModel({
     // Roaming state
     shuffledWaypoints: shuffleArray(roamWaypoints),
     waypointIndex: 0,
-    pauseDuration: 2 + Math.random() * 3, // 2-5s pause at waypoints
+    pauseDuration: 2 + Math.random() * 3,
+    // Track which side of divider we're on (for wall collision)
+    lastSideOfDivider: position[0] < 0.3 ? -1 : 1,
   });
 
   const b = behaviorRef.current;
@@ -135,7 +140,6 @@ export default function AgentModel({
         break;
       }
       case 'idle': {
-        // If not at desk, walk back; otherwise go idle directly
         const distToHome = b.currentPos.distanceTo(b.homePos);
         if (distToHome > 0.3) {
           startWalkTo(b.homePos, 'returning-to-desk');
@@ -171,6 +175,11 @@ export default function AgentModel({
   const initialized = useRef(false);
   if (!initialized.current) {
     initialized.current = true;
+    // Write initial position to shared array
+    if (sharedPositions) {
+      sharedPositions[agentIndex * 2] = position[0];
+      sharedPositions[agentIndex * 2 + 1] = position[2];
+    }
     if (status === 'discussing' && meetingPositions.length > 0) {
       const seatIdx = agentIndex % meetingPositions.length;
       const seat = meetingPositions[seatIdx];
@@ -199,7 +208,7 @@ export default function AgentModel({
           b.currentPos.copy(b.meetingSeat);
           b.internalState = 'meeting';
           b.stateTimer = 0;
-          b.stateDuration = 999; // stay until status changes
+          b.stateDuration = 999;
           break;
         }
         case 'walking-to-waypoint': {
@@ -211,11 +220,9 @@ export default function AgentModel({
           break;
         }
         case 'pausing-at-waypoint': {
-          // If still roaming, pick next waypoint
           if (status === 'roaming' && roamWaypoints.length > 0) {
             pickNextWaypoint();
           } else {
-            // Status changed while pausing, go back to desk
             startWalkTo(b.homePos, 'returning-to-desk');
           }
           break;
@@ -227,7 +234,6 @@ export default function AgentModel({
           b.stateDuration = 999;
           break;
         }
-        // idle, working, meeting don't auto-transition
         default:
           break;
       }
@@ -240,6 +246,12 @@ export default function AgentModel({
 
     // Smooth rotation
     b.currentRotY = THREE.MathUtils.lerp(b.currentRotY, b.targetRotY, 0.05);
+
+    // Track if this is a mobile state (needs collision)
+    const isWalking = b.internalState === 'walking-to-meeting'
+      || b.internalState === 'walking-to-waypoint'
+      || b.internalState === 'returning-to-desk';
+    const isPausing = b.internalState === 'pausing-at-waypoint';
 
     switch (b.internalState) {
       case 'idle': {
@@ -271,9 +283,85 @@ export default function AgentModel({
       case 'walking-to-meeting':
       case 'walking-to-waypoint':
       case 'returning-to-desk': {
-        groupRef.current.position.x = THREE.MathUtils.lerp(b.startPos.x, b.targetPos.x, ease);
-        groupRef.current.position.z = THREE.MathUtils.lerp(b.startPos.z, b.targetPos.z, ease);
+        let px = THREE.MathUtils.lerp(b.startPos.x, b.targetPos.x, ease);
+        let pz = THREE.MathUtils.lerp(b.startPos.z, b.targetPos.z, ease);
+
+        // ── COLLISION RESOLUTION ──
+        if (collisionData && sharedPositions) {
+          // 1. Agent-agent separation
+          for (let i = 0; i < totalAgents; i++) {
+            if (i === agentIndex) continue;
+            const ox = sharedPositions[i * 2];
+            const oz = sharedPositions[i * 2 + 1];
+            const adx = px - ox;
+            const adz = pz - oz;
+            const adist = Math.sqrt(adx * adx + adz * adz);
+            if (adist < collisionData.minAgentDist && adist > 0.001) {
+              const push = (collisionData.minAgentDist - adist) * 0.5;
+              px += (adx / adist) * push;
+              pz += (adz / adist) * push;
+            }
+          }
+
+          // 2. Obstacle AABB pushout (desks)
+          for (let i = 0; i < collisionData.obstacles.length; i++) {
+            const ob = collisionData.obstacles[i];
+            if (px > ob.minX && px < ob.maxX && pz > ob.minZ && pz < ob.maxZ) {
+              // Find shortest escape direction
+              const escapeLeft = px - ob.minX;
+              const escapeRight = ob.maxX - px;
+              const escapeTop = pz - ob.minZ;
+              const escapeBottom = ob.maxZ - pz;
+              const minEscape = Math.min(escapeLeft, escapeRight, escapeTop, escapeBottom);
+              if (minEscape === escapeLeft) px = ob.minX;
+              else if (minEscape === escapeRight) px = ob.maxX;
+              else if (minEscape === escapeTop) pz = ob.minZ;
+              else pz = ob.maxZ;
+            }
+          }
+
+          // 3. Meeting table circle collision (only for non-meeting agents)
+          if (b.internalState !== 'walking-to-meeting') {
+            const mt = collisionData.meetingTable;
+            const mtdx = px - mt.x;
+            const mtdz = pz - mt.z;
+            const mtdist = Math.sqrt(mtdx * mtdx + mtdz * mtdz);
+            const mtMinDist = mt.radius + collisionData.agentRadius;
+            if (mtdist < mtMinDist && mtdist > 0.001) {
+              px = mt.x + (mtdx / mtdist) * mtMinDist;
+              pz = mt.z + (mtdz / mtdist) * mtMinDist;
+            }
+          }
+
+          // 4. Divider wall collision
+          const div = collisionData.divider;
+          const inDoorZone = pz > div.doorZMin && pz < div.doorZMax;
+          if (!inDoorZone) {
+            const wallPad = collisionData.agentRadius;
+            // If agent is trying to cross the wall
+            if (b.lastSideOfDivider < 0 && px > div.x - wallPad) {
+              px = div.x - wallPad;
+            } else if (b.lastSideOfDivider > 0 && px < div.x + wallPad) {
+              px = div.x + wallPad;
+            }
+          } else {
+            // In door zone — update side tracking
+            if (px < div.x) b.lastSideOfDivider = -1;
+            else b.lastSideOfDivider = 1;
+          }
+
+          // 5. Room bounds clamping
+          const rb = collisionData.roomBounds;
+          if (px < rb.minX) px = rb.minX;
+          if (px > rb.maxX) px = rb.maxX;
+          if (pz < rb.minZ) pz = rb.minZ;
+          if (pz > rb.maxZ) pz = rb.maxZ;
+        }
+
+        groupRef.current.position.x = px;
+        groupRef.current.position.z = pz;
         groupRef.current.position.y = Math.abs(Math.sin(t * 8)) * 0.035;
+
         const dx = b.targetPos.x - b.startPos.x;
         const dz = b.targetPos.z - b.startPos.z;
         if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
@@ -283,7 +371,7 @@ export default function AgentModel({
         groupRef.current.rotation.z = Math.sin(t * 6) * 0.03;
         groupRef.current.rotation.x = 0;
         groupRef.current.scale.set(scale, scale, scale);
-        b.currentPos.set(groupRef.current.position.x, 0, groupRef.current.position.z);
+        b.currentPos.set(px, 0, pz);
         break;
       }
 
@@ -302,18 +390,59 @@ export default function AgentModel({
       }
 
       case 'pausing-at-waypoint': {
-        // Stand still at waypoint, look around subtly
-        groupRef.current.position.x = b.currentPos.x;
-        groupRef.current.position.z = b.currentPos.z;
+        let px = b.currentPos.x;
+        let pz = b.currentPos.z;
+
+        // Apply agent-agent separation even while pausing
+        if (collisionData && sharedPositions) {
+          for (let i = 0; i < totalAgents; i++) {
+            if (i === agentIndex) continue;
+            const ox = sharedPositions[i * 2];
+            const oz = sharedPositions[i * 2 + 1];
+            const adx = px - ox;
+            const adz = pz - oz;
+            const adist = Math.sqrt(adx * adx + adz * adz);
+            if (adist < collisionData.minAgentDist && adist > 0.001) {
+              const push = (collisionData.minAgentDist - adist) * 0.3;
+              px += (adx / adist) * push;
+              pz += (adz / adist) * push;
+            }
+          }
+
+          // Room bounds
+          const rb = collisionData.roomBounds;
+          if (px < rb.minX) px = rb.minX;
+          if (px > rb.maxX) px = rb.maxX;
+          if (pz < rb.minZ) pz = rb.minZ;
+          if (pz > rb.maxZ) pz = rb.maxZ;
+        }
+
+        groupRef.current.position.x = px;
+        groupRef.current.position.z = pz;
         groupRef.current.position.y = Math.sin(t * 0.8 + b.bobPhase) * 0.005;
-        // Slow look-around rotation
         b.targetRotY += Math.sin(t * 0.5 + b.bobPhase) * 0.002;
         groupRef.current.rotation.y = b.currentRotY;
         groupRef.current.rotation.x = 0;
         groupRef.current.rotation.z = 0;
         const pauseBreathe = 1 + Math.sin(t * 0.9 + b.bobPhase) * 0.003;
         groupRef.current.scale.set(scale * pauseBreathe, scale * pauseBreathe, scale * pauseBreathe);
+        b.currentPos.set(px, 0, pz);
         break;
+      }
+    }
+
+    // Always write current position to shared array for other agents to read
+    if (sharedPositions) {
+      sharedPositions[agentIndex * 2] = groupRef.current.position.x;
+      sharedPositions[agentIndex * 2 + 1] = groupRef.current.position.z;
+    }
+
+    // Update divider side tracking based on current position
+    if (collisionData) {
+      if (groupRef.current.position.x < collisionData.divider.x) {
+        b.lastSideOfDivider = -1;
+      } else {
+        b.lastSideOfDivider = 1;
       }
     }
   });

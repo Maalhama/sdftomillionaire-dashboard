@@ -73,6 +73,58 @@ const meetingSeatPositions: [number, number, number][] = [
   [2, 0, -0.9],     // seat 5
 ];
 
+// ═══ COLLISION DATA ═══
+// Agent collision radius
+const AGENT_RADIUS = 0.4;
+const MIN_AGENT_DIST = AGENT_RADIUS * 2; // 0.8
+
+// Room walkable bounds (outer walls - agent radius padding)
+const ROOM_BOUNDS = {
+  minX: -FLOOR_SIZE.w / 2 + AGENT_RADIUS,  // -6.6
+  maxX: FLOOR_SIZE.w / 2 - AGENT_RADIUS,   //  6.6
+  minZ: -FLOOR_SIZE.d / 2 + AGENT_RADIUS,  // -4.6
+  maxZ: FLOOR_SIZE.d / 2 - AGENT_RADIUS,   //  4.6
+};
+
+// Divider wall (x=0.3, door gap at z ∈ [-1.5, 1.5])
+const DIVIDER = { x: 0.3, doorZMin: -1.5, doorZMax: 1.5 };
+
+// Meeting table circle collision (agents can sit around edge but not walk through center)
+const MEETING_TABLE_COLLISION = { x: 3.5, z: 0, radius: 0.9 };
+
+// Obstacle AABBs — desks + chairs (padded by agent radius)
+// Each desk: table at [pos.x+0.4, pos.z], size 0.6×0.8, chair at [pos.x-0.3, pos.z]
+// Combined footprint ≈ center [pos.x+0.05, pos.z], extent 1.1 × 0.8 + padding
+const OBSTACLE_BOXES: { minX: number; maxX: number; minZ: number; maxZ: number }[] =
+  deskPositions.map(pos => ({
+    minX: pos[0] - 0.6 - AGENT_RADIUS,
+    maxX: pos[0] + 1.0 + AGENT_RADIUS,
+    minZ: pos[2] - 0.5 - AGENT_RADIUS,
+    maxZ: pos[2] + 0.5 + AGENT_RADIUS,
+  }));
+
+export interface CollisionData {
+  roomBounds: typeof ROOM_BOUNDS;
+  obstacles: typeof OBSTACLE_BOXES;
+  meetingTable: typeof MEETING_TABLE_COLLISION;
+  divider: typeof DIVIDER;
+  agentRadius: number;
+  minAgentDist: number;
+}
+
+const COLLISION_DATA: CollisionData = {
+  roomBounds: ROOM_BOUNDS,
+  obstacles: OBSTACLE_BOXES,
+  meetingTable: MEETING_TABLE_COLLISION,
+  divider: DIVIDER,
+  agentRadius: AGENT_RADIUS,
+  minAgentDist: MIN_AGENT_DIST,
+};
+
+// Shared agent positions array: 6 agents × 2 (x, z)
+// Written by each agent in useFrame, read by others for separation
+const SHARED_POSITIONS = new Float32Array(12);
+
 // Roam waypoints — positions scattered across both rooms for agents to walk through
 const ROAM_WAYPOINTS: [number, number, number][] = [
   // Office area (left side)
@@ -627,6 +679,9 @@ function AgentStation({
         meetingPositions={meetingSeatPositions}
         roamWaypoints={ROAM_WAYPOINTS}
         agentIndex={configIndex}
+        collisionData={COLLISION_DATA}
+        sharedPositions={SHARED_POSITIONS}
+        totalAgents={6}
       />
 
       {/* Desk */}
