@@ -47,40 +47,12 @@ export async function POST(
       );
     }
 
-    // Extraire user_id depuis le token auth (optionnel)
-    let userId: string | null = null;
-    const authHeader = request.headers.get('authorization');
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.slice(7);
-      if (token) {
-        const { data: { user } } = await supabase.auth.getUser(token);
-        userId = user?.id ?? null;
-      }
-    }
-
-    // Hash IP (fallback pour les anonymes)
+    // Hash IP pour dédoublonnage
     const forwarded = request.headers.get('x-forwarded-for');
     const ip = forwarded?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
     const ipHash = createHash('sha256').update(ip).digest('hex');
 
-    // Vérifier doublon par user_id (si connecté)
-    if (userId) {
-      const { data: existingUserVote } = await supabase
-        .from('user_votes')
-        .select('id')
-        .eq('prompt_id', id)
-        .eq('user_id', userId)
-        .single();
-
-      if (existingUserVote) {
-        return NextResponse.json(
-          { error: 'Tu as déjà voté pour cette idée.' },
-          { status: 409 }
-        );
-      }
-    }
-
-    // Vérifier doublon par IP (toujours, même connecté)
+    // Vérifier doublon par IP
     const { data: existingIpVote } = await supabase
       .from('user_votes')
       .select('id')
@@ -101,7 +73,6 @@ export async function POST(
       .insert({
         prompt_id: id,
         ip_hash: ipHash,
-        user_id: userId,
       });
 
     if (insertError) {
@@ -133,31 +104,6 @@ export async function POST(
         .from('user_prompts')
         .update({ votes_count: (prompt.votes_count || 0) + 1 })
         .eq('id', id);
-    }
-
-    // Incrémenter le compteur profil si connecté (atomic via SQL)
-    if (userId) {
-      const { error: profileError } = await supabase.rpc('increment_counter', {
-        table_name: 'profiles',
-        column_name: 'votes_count',
-        row_id: userId,
-      });
-
-      if (profileError) {
-        // Fallback
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('votes_count')
-          .eq('id', userId)
-          .single();
-
-        if (profile) {
-          await supabase
-            .from('profiles')
-            .update({ votes_count: (profile.votes_count || 0) + 1 })
-            .eq('id', userId);
-        }
-      }
     }
 
     return NextResponse.json({
