@@ -1548,34 +1548,170 @@ function QuestBubble({ position, name, color }: { position: [number, number, num
   );
 }
 
-// ═══ HABBO CHAT STACK ═══
-// Agent name → color lookup
-const SPEAKER_COLORS: Record<string, string> = {
-  'CEO': '#f59e0b',
-  'Kira': '#8b5cf6',
-  'Madara': '#22c55e',
-  'Stark': '#ec4899',
-  'L': '#3b82f6',
-  'Usopp': '#ef4444',
+// ═══ HABBO CHAT SYSTEM ═══
+// Speaker name → agent index (for seat position lookup)
+const SPEAKER_TO_INDEX: Record<string, number> = {
+  'CEO': 0, 'Kira': 1, 'Madara': 2, 'Stark': 3, 'L': 4, 'Usopp': 5,
+  // uppercase variants from agentConfigs
+  'KIRA': 1, 'MADARA': 2, 'STARK': 3, 'USOPP': 5,
+  // agent IDs
+  'opus': 0, 'brain': 1, 'growth': 2, 'creator': 3, 'twitter-alt': 4, 'company-observer': 5,
 };
 
-interface ChatMessage {
+const SPEAKER_COLORS: Record<string, string> = {
+  'CEO': '#f59e0b', 'Kira': '#8b5cf6', 'Madara': '#22c55e',
+  'Stark': '#ec4899', 'L': '#3b82f6', 'Usopp': '#ef4444',
+  'KIRA': '#8b5cf6', 'MADARA': '#22c55e', 'STARK': '#ec4899', 'USOPP': '#ef4444',
+  'opus': '#f59e0b', 'brain': '#8b5cf6', 'growth': '#22c55e',
+  'creator': '#ec4899', 'twitter-alt': '#3b82f6', 'company-observer': '#ef4444',
+};
+
+const SPEAKER_DISPLAY: Record<string, string> = {
+  'opus': 'CEO', 'brain': 'Kira', 'growth': 'Madara',
+  'creator': 'Stark', 'twitter-alt': 'L', 'company-observer': 'Usopp',
+  'KIRA': 'Kira', 'MADARA': 'Madara', 'STARK': 'Stark', 'USOPP': 'Usopp',
+};
+
+interface ActiveBubble {
   id: number;
   speaker: string;
+  displayName: string;
   text: string;
   color: string;
+  seatPos: [number, number, number];
   createdAt: number;
 }
 
-function HabboChatStack({ conversationLog, isDiscussing }: { conversationLog?: ConversationTurn[]; isDiscussing: boolean }) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+// Single Habbo-style bubble rendered above an agent's seat position
+// It floats upward continuously and fades out
+function HabboBubbleFloat({ bubble }: { bubble: ActiveBubble }) {
+  const startY = bubble.seatPos[1] + 2.8;
+  const [offset, setOffset] = useState(0);
+  const [opacity, setOpacity] = useState(0);
+  const mountTime = useRef(Date.now());
+
+  useEffect(() => {
+    // Fade in
+    requestAnimationFrame(() => setOpacity(1));
+  }, []);
+
+  // Continuously float upward
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const age = (Date.now() - mountTime.current) / 1000;
+      setOffset(age * 8); // 8px per second upward
+      // Fade out in last 3s of 10s life
+      if (age > 7) {
+        setOpacity(Math.max(0, 1 - (age - 7) / 3));
+      }
+    }, 50);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <Html
+      position={[bubble.seatPos[0], startY, bubble.seatPos[2]]}
+      center
+      style={{ pointerEvents: 'none' }}
+    >
+      <div
+        className="select-none"
+        style={{
+          transform: `translateY(${-offset}px)`,
+          opacity,
+          transition: 'opacity 0.4s ease',
+        }}
+      >
+        {/* Habbo-style wide bubble */}
+        <div
+          style={{
+            background: '#fffef5',
+            border: `2px solid ${bubble.color}`,
+            borderRadius: '14px',
+            padding: '5px 10px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '8px',
+            boxShadow: `2px 3px 0px rgba(0, 0, 0, 0.15), 0 0 8px ${bubble.color}33`,
+            minWidth: '200px',
+            maxWidth: '400px',
+            position: 'relative',
+            animation: 'habboPopIn 0.25s ease-out',
+          }}
+        >
+          {/* Avatar circle */}
+          <div
+            style={{
+              width: '18px',
+              height: '18px',
+              minWidth: '18px',
+              borderRadius: '50%',
+              background: bubble.color,
+              boxShadow: `0 0 6px ${bubble.color}88`,
+              marginTop: '1px',
+            }}
+          />
+          {/* Name + Text */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', flexWrap: 'wrap' }}>
+              <span
+                className="font-mono"
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 900,
+                  color: bubble.color,
+                  whiteSpace: 'nowrap',
+                  textShadow: `0 0 2px ${bubble.color}44`,
+                }}
+              >
+                {bubble.displayName}:
+              </span>
+              <span
+                className="font-sans"
+                style={{
+                  fontSize: '11px',
+                  lineHeight: 1.4,
+                  color: '#1a1a1a',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {bubble.text}
+              </span>
+            </div>
+          </div>
+        </div>
+        {/* Speech pointer triangle — points down to the agent */}
+        <div
+          style={{
+            width: 0,
+            height: 0,
+            borderLeft: '6px solid transparent',
+            borderRight: '6px solid transparent',
+            borderTop: `8px solid ${bubble.color}`,
+            margin: '0 auto',
+            filter: 'drop-shadow(1px 1px 0 rgba(0,0,0,0.1))',
+          }}
+        />
+      </div>
+      <style>{`
+        @keyframes habboPopIn {
+          0% { opacity: 0; transform: scale(0.8) translateY(10px); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+      `}</style>
+    </Html>
+  );
+}
+
+// Controller that queues messages and shows them one-by-one above the speaking agent
+function HabboChatController({ conversationLog, isDiscussing }: { conversationLog?: ConversationTurn[]; isDiscussing: boolean }) {
+  const [activeBubbles, setActiveBubbles] = useState<ActiveBubble[]>([]);
   const lastProcessedTurn = useRef(-1);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const queueRef = useRef<ChatMessage[]>([]);
+  const queueRef = useRef<ActiveBubble[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const discussionStartRef = useRef<number>(0);
 
-  // Track when discussion starts (agents need ~10s to walk to table)
+  // Track discussion start time
   useEffect(() => {
     if (isDiscussing && discussionStartRef.current === 0) {
       discussionStartRef.current = Date.now();
@@ -1585,62 +1721,63 @@ function HabboChatStack({ conversationLog, isDiscussing }: { conversationLog?: C
     }
   }, [isDiscussing]);
 
-  // Drip-feed messages one by one from the queue
-  const drainQueue = useCallback(() => {
+  // Show next bubble from queue
+  const showNext = useCallback(() => {
     if (queueRef.current.length === 0) {
       timerRef.current = null;
       return;
     }
     const next = queueRef.current.shift()!;
-    next.createdAt = Date.now(); // timestamp when actually shown
-    setMessages(prev => [...prev, next]);
+    next.createdAt = Date.now();
+    setActiveBubbles(prev => [...prev, next]);
 
-    // Next message after 3s delay
-    timerRef.current = setTimeout(drainQueue, 3000);
+    // Next message after 4s (enough time to read + bubble starts floating)
+    timerRef.current = setTimeout(showNext, 4000);
   }, []);
 
-  // Queue new messages as conversation_log grows
+  // Queue new turns from conversation_log
   useEffect(() => {
     if (!conversationLog || conversationLog.length === 0) return;
 
     const newTurns = conversationLog.filter(t => t.turn > lastProcessedTurn.current);
     if (newTurns.length === 0) return;
 
-    const newMessages: ChatMessage[] = newTurns.map(t => {
+    for (const t of newTurns) {
       lastProcessedTurn.current = t.turn;
-      return {
+      const agentIdx = SPEAKER_TO_INDEX[t.speaker] ?? 0;
+      const seatPos = meetingSeatPositions[agentIdx] || meetingSeatPositions[0];
+      queueRef.current.push({
         id: t.turn,
         speaker: t.speaker,
+        displayName: SPEAKER_DISPLAY[t.speaker] || t.speaker,
         text: t.dialogue || t.message || '',
         color: SPEAKER_COLORS[t.speaker] || '#00ff41',
-        createdAt: 0, // set when actually displayed
-      };
-    });
+        seatPos,
+        createdAt: 0,
+      });
+    }
 
-    queueRef.current.push(...newMessages);
-
-    // Start draining if not already running
+    // Start drain if idle
     if (!timerRef.current) {
-      // Wait for agents to reach the table (~10s walk time) before first message
       const elapsed = Date.now() - discussionStartRef.current;
       const walkDelay = Math.max(0, 10000 - elapsed);
-      timerRef.current = setTimeout(drainQueue, walkDelay);
+      timerRef.current = setTimeout(showNext, walkDelay);
     }
-  }, [conversationLog, drainQueue]);
+  }, [conversationLog, showNext]);
 
-  // Remove messages older than 15s
+  // Remove bubbles after 10s
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
-      setMessages(prev => prev.filter(m => now - m.createdAt < 15000));
-    }, 1500);
+      setActiveBubbles(prev => prev.filter(b => now - b.createdAt < 10000));
+    }, 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Reset when discussion ends
+  // Reset on discussion end
   useEffect(() => {
     if (!isDiscussing) {
-      setMessages([]);
+      setActiveBubbles([]);
       queueRef.current = [];
       lastProcessedTurn.current = -1;
       if (timerRef.current) {
@@ -1650,103 +1787,12 @@ function HabboChatStack({ conversationLog, isDiscussing }: { conversationLog?: C
     }
   }, [isDiscussing]);
 
-  if (messages.length === 0) return null;
-
   return (
-    <Html position={[7, 4.5, 0]} center style={{ pointerEvents: 'none' }}>
-      <div
-        ref={scrollRef}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '3px',
-          width: '380px',
-          maxHeight: '160px',
-          overflow: 'hidden',
-        }}
-      >
-        {messages.map((msg, idx) => {
-          const age = (Date.now() - msg.createdAt) / 1000;
-          // Scroll up: older messages move higher
-          const translateY = -age * 3;
-          // Fade out in last 3 seconds of life
-          const opacity = age > 9 ? Math.max(0, 1 - (age - 9) / 3) : 1;
-
-          return (
-            <div
-              key={`${msg.id}-${idx}`}
-              style={{
-                transform: `translateY(${translateY}px)`,
-                opacity,
-                transition: 'transform 1.5s linear, opacity 1.5s linear',
-              }}
-            >
-              {/* Habbo-style wide bubble */}
-              <div
-                style={{
-                  background: '#fffef5',
-                  border: `1.5px solid ${msg.color}`,
-                  borderRadius: '10px',
-                  padding: '3px 8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: '1px 2px 0px rgba(0, 0, 0, 0.12)',
-                  animation: idx === messages.length - 1 ? 'habboSlideIn 0.3s ease-out' : undefined,
-                }}
-              >
-                {/* Avatar dot */}
-                <div
-                  style={{
-                    width: '14px',
-                    height: '14px',
-                    minWidth: '14px',
-                    borderRadius: '50%',
-                    background: msg.color,
-                    boxShadow: `0 0 3px ${msg.color}`,
-                  }}
-                />
-                {/* Name + Text on same line */}
-                <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                  <span
-                    className="font-mono"
-                    style={{
-                      fontSize: '10px',
-                      fontWeight: 800,
-                      color: msg.color,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {msg.speaker}:
-                  </span>
-                  <span
-                    className="font-sans"
-                    style={{
-                      fontSize: '10px',
-                      lineHeight: 1.3,
-                      color: '#1a1a1a',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                      wordBreak: 'break-word',
-                    }}
-                  >
-                    {msg.text}
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <style>{`
-        @keyframes habboSlideIn {
-          0% { opacity: 0; transform: translateY(8px) scale(0.95); }
-          100% { opacity: 1; transform: translateY(0) scale(1); }
-        }
-      `}</style>
-    </Html>
+    <>
+      {activeBubbles.map(bubble => (
+        <HabboBubbleFloat key={`habbo-${bubble.id}`} bubble={bubble} />
+      ))}
+    </>
   );
 }
 
@@ -2093,8 +2139,8 @@ export default function HQRoom3D({ liveAgents, conversationLog }: { liveAgents?:
             />
           ))}
 
-          {/* ── Habbo Chat Stack (above meeting table) ── */}
-          <HabboChatStack
+          {/* ── Habbo Chat — bubbles appear above each speaking agent ── */}
+          <HabboChatController
             conversationLog={conversationLog}
             isDiscussing={mergedConfigs.some(c => c.status === 'discussing')}
           />
