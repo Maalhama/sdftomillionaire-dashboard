@@ -117,15 +117,31 @@ const DIVIDER = { x: PARTITION_X, doorZMin: DOOR_Z_MIN, doorZMax: DOOR_Z_MAX };
 
 const MEETING_TABLE_COLLISION = { x: MEETING_TABLE_POS[0], z: MEETING_TABLE_POS[2], radius: 1.8 };
 
-// Obstacle AABBs — desk islands (padded by agent radius)
-// Each island: ~3.2 wide (x) × 1.2 deep (z)
-const OBSTACLE_BOXES: { minX: number; maxX: number; minZ: number; maxZ: number }[] =
-  ISLAND_CENTERS.map(pos => ({
+// Obstacle AABBs — ALL furniture padded by agent radius
+// Agents will steer around these via the velocity avoidance system
+const OBSTACLE_BOXES: { minX: number; maxX: number; minZ: number; maxZ: number }[] = [
+  // ── Desk islands (3.2 × 1.2 each) ──
+  ...ISLAND_CENTERS.map(pos => ({
     minX: pos[0] - 1.8 - AGENT_RADIUS,
     maxX: pos[0] + 1.8 + AGENT_RADIUS,
     minZ: pos[2] - 0.7 - AGENT_RADIUS,
     maxZ: pos[2] + 0.7 + AGENT_RADIUS,
-  }));
+  })),
+  // ── Coffee station at [-2, 0, 7] — 1.3 × 0.7 ──
+  { minX: -2.65 - AGENT_RADIUS, maxX: -1.35 + AGENT_RADIUS, minZ: 6.65 - AGENT_RADIUS, maxZ: 7.35 + AGENT_RADIUS },
+  // ── Water cooler at [-3, 0, 7.5] — 0.35 × 0.35 ──
+  { minX: -3.2 - AGENT_RADIUS, maxX: -2.8 + AGENT_RADIUS, minZ: 7.3 - AGENT_RADIUS, maxZ: 7.7 + AGENT_RADIUS },
+  // ── Sofa at [10.5, 0, 6.5] rotated -90° — 0.6 × 1.4 ──
+  { minX: 10.5 - 0.8 - AGENT_RADIUS, maxX: 10.5 + 0.8 + AGENT_RADIUS, minZ: 6.5 - 0.4 - AGENT_RADIUS, maxZ: 6.5 + 0.4 + AGENT_RADIUS },
+  // ── Sofa at [10.5, 0, -6.5] rotated -90° — 0.6 × 1.4 ──
+  { minX: 10.5 - 0.8 - AGENT_RADIUS, maxX: 10.5 + 0.8 + AGENT_RADIUS, minZ: -6.5 - 0.4 - AGENT_RADIUS, maxZ: -6.5 + 0.4 + AGENT_RADIUS },
+  // ── Server rack at [0.5, 0, 7] rotated — 0.4 × 0.6 ──
+  { minX: 0.5 - 0.4 - AGENT_RADIUS, maxX: 0.5 + 0.4 + AGENT_RADIUS, minZ: 7 - 0.4 - AGENT_RADIUS, maxZ: 7 + 0.4 + AGENT_RADIUS },
+  // ── Bookshelves on left wall (against wall, 1.5 wide × 0.35 deep) ──
+  { minX: -13 - AGENT_RADIUS, maxX: -12.45 + AGENT_RADIUS, minZ: -5.75 - AGENT_RADIUS, maxZ: -4.25 + AGENT_RADIUS },
+  { minX: -13 - AGENT_RADIUS, maxX: -12.45 + AGENT_RADIUS, minZ: -0.75 - AGENT_RADIUS, maxZ:  0.75 + AGENT_RADIUS },
+  { minX: -13 - AGENT_RADIUS, maxX: -12.45 + AGENT_RADIUS, minZ:  4.25 - AGENT_RADIUS, maxZ:  5.75 + AGENT_RADIUS },
+];
 
 export interface CollisionData {
   roomBounds: typeof ROOM_BOUNDS;
@@ -154,7 +170,7 @@ const ROAM_WAYPOINTS: [number, number, number][] = [
   [-11, 0, -7.5],   // far top-left
   [-11, 0,  7.5],   // far bottom-left
   [-2,  0, -7.5],   // near top-left
-  [-2,  0,  7.5],   // near bottom-left
+  [-4.5, 0,  7.5],  // near bottom-left (avoids coffee station)
   [-6.5, 0, -2.5],  // between island 1 & 2
   [-6.5, 0,  2.5],  // between island 2 & 3
   [-2,  0, -5],     // corridor right of desks top
@@ -169,8 +185,8 @@ const ROAM_WAYPOINTS: [number, number, number][] = [
   // ── Conference room ──
   [3.5, 0, -6],     // conference top-left
   [3.5, 0,  6],     // conference bottom-left
-  [10,  0, -6],     // conference top-right
-  [10,  0,  6],     // conference bottom-right
+  [8.5, 0, -6],     // conference top-right (avoids sofa)
+  [8.5, 0,  6],     // conference bottom-right (avoids sofa)
   [4,   0, -3],     // near table left-top
   [10,  0, -3],     // far right top
   [4,   0,  3],     // near table left-bottom
@@ -831,23 +847,65 @@ function Sofa({ position, rotation = [0, 0, 0] }: {
   );
 }
 
-// Floor rug (rectangular glow mat)
-function Rug({ position, size = [2, 3], color = '#00ff41' }: {
+// Matrix pixel-art rug — code rain columns made of small glowing blocks
+function MatrixRug({ position, size = [2.5, 3], seed = 0 }: {
   position: [number, number, number];
   size?: [number, number];
-  color?: string;
+  seed?: number;
 }) {
+  const pixelSize = 0.12;
+  const cols = Math.floor(size[0] / pixelSize);
+  const rows = Math.floor(size[1] / pixelSize);
+
+  // Deterministic "random" from seed
+  const hash = (a: number, b: number) => {
+    const x = Math.sin(a * 127.1 + b * 311.7 + seed * 73.37) * 43758.5453;
+    return x - Math.floor(x);
+  };
+
+  // Generate pixel pattern — sparse code rain columns
+  const pixels: { x: number; z: number; brightness: number }[] = [];
+  for (let c = 0; c < cols; c++) {
+    if (hash(c, 999) > 0.35) continue; // only ~35% of columns active
+    const colHeight = Math.floor(hash(c, 0) * rows * 0.6) + 3;
+    const startRow = Math.floor(hash(c, 1) * (rows - colHeight));
+    for (let r = startRow; r < startRow + colHeight && r < rows; r++) {
+      const distFromHead = r - startRow;
+      const brightness = Math.max(0.05, 1 - distFromHead / colHeight);
+      if (hash(c, r) > 0.6) continue; // gaps in the stream
+      pixels.push({
+        x: (c - cols / 2) * pixelSize,
+        z: (r - rows / 2) * pixelSize,
+        brightness,
+      });
+    }
+  }
+
   return (
     <group position={position}>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
+      {/* Dark base mat */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.004, 0]}>
         <planeGeometry args={size} />
-        <meshStandardMaterial color="#0a0a0a" emissive={color} emissiveIntensity={0.015} />
+        <meshStandardMaterial color="#010301" />
       </mesh>
-      {/* Border */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
-        <ringGeometry args={[Math.min(size[0], size[1]) * 0.48, Math.min(size[0], size[1]) * 0.5, 4]} />
-        <meshBasicMaterial color={color} transparent opacity={0.08} side={THREE.DoubleSide} />
+      {/* Border glow */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
+        <planeGeometry args={[size[0] + 0.06, size[1] + 0.06]} />
+        <meshBasicMaterial color="#00ff41" transparent opacity={0.04} side={THREE.DoubleSide} />
       </mesh>
+      {/* Matrix pixels */}
+      {pixels.map((px, i) => (
+        <mesh key={i} position={[px.x, 0.006, px.z]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[pixelSize * 0.85, pixelSize * 0.85]} />
+          <meshBasicMaterial
+            color="#00ff41"
+            transparent
+            opacity={px.brightness * 0.35}
+          />
+        </mesh>
+      ))}
+      {/* Soft green glow */}
+      <pointLight position={[0, 0.15, 0]} color="#00ff41" intensity={0.06} distance={2.5} />
     </group>
   );
 }
@@ -978,32 +1036,28 @@ function CeilingLight({ position, length, axis = 'x' }: {
   );
 }
 
-// Floor with subtle grid
+// Matrix-style floor — pure black with bright green grid
 function RoomFloor() {
   return (
     <>
+      {/* Pure black base */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
+        <planeGeometry args={[FLOOR_SIZE.w, FLOOR_SIZE.d]} />
+        <meshStandardMaterial color="#010101" roughness={0.95} />
+      </mesh>
+      {/* Matrix grid overlay */}
       <Grid
         args={[FLOOR_SIZE.w, FLOOR_SIZE.d]}
-        cellSize={1}
-        cellThickness={0.3}
+        cellSize={0.5}
+        cellThickness={0.5}
         cellColor="#00ff41"
-        sectionSize={4}
-        sectionThickness={0.5}
+        sectionSize={2}
+        sectionThickness={1.0}
         sectionColor="#00ff41"
-        fadeDistance={18}
-        fadeStrength={2}
-        position={[0, 0, 0]}
+        fadeDistance={22}
+        fadeStrength={1.2}
+        position={[0, 0.001, 0]}
       />
-      {/* Dark floor */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
-        <planeGeometry args={[FLOOR_SIZE.w, FLOOR_SIZE.d]} />
-        <meshStandardMaterial color="#0c0c0c" roughness={0.6} metalness={0.1} />
-      </mesh>
-      {/* Ceiling */}
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, WALL_HEIGHT, 0]}>
-        <planeGeometry args={[FLOOR_SIZE.w, FLOOR_SIZE.d]} />
-        <meshStandardMaterial color="#040404" transparent opacity={0.6} />
-      </mesh>
     </>
   );
 }
@@ -1367,19 +1421,6 @@ export default function HQRoom3D({ liveAgents }: { liveAgents?: AgentLiveData[] 
           <RoomWalls />
           <GlassPartition />
 
-          {/* ── Ceiling lights (workspace — 2 rows) ── */}
-          <CeilingLight position={[-9, WALL_HEIGHT - 0.05, -5]} length={4} axis="x" />
-          <CeilingLight position={[-9, WALL_HEIGHT - 0.05,  0]} length={4} axis="x" />
-          <CeilingLight position={[-9, WALL_HEIGHT - 0.05,  5]} length={4} axis="x" />
-          <CeilingLight position={[-4, WALL_HEIGHT - 0.05, -5]} length={4} axis="x" />
-          <CeilingLight position={[-4, WALL_HEIGHT - 0.05,  0]} length={4} axis="x" />
-          <CeilingLight position={[-4, WALL_HEIGHT - 0.05,  5]} length={4} axis="x" />
-          {/* Corridor light */}
-          <CeilingLight position={[-1, WALL_HEIGHT - 0.05,  0]} length={6} axis="z" />
-          {/* Conference room — 2 lights */}
-          <CeilingLight position={[5, WALL_HEIGHT - 0.05, 0]} length={4} axis="x" />
-          <CeilingLight position={[9, WALL_HEIGHT - 0.05, 0]} length={4} axis="x" />
-
           {/* ── Room labels ── */}
           <RoomLabel text="// workspace" position={[-6.5, WALL_HEIGHT + 0.1, -FLOOR_SIZE.d / 2 + 0.3]} />
           <RoomLabel text="// conference" position={[7, WALL_HEIGHT + 0.1, -FLOOR_SIZE.d / 2 + 0.3]} />
@@ -1437,11 +1478,22 @@ export default function HQRoom3D({ liveAgents }: { liveAgents?: AgentLiveData[] 
           {/* Coat rack near entrance */}
           <CoatRack position={[0.5, 0, -5]} />
 
-          {/* Lounge area — sofa + rug in conference back */}
-          <Sofa position={[10, 0, 6]} rotation={[0, -90, 0]} />
-          <Sofa position={[10, 0, -6]} rotation={[0, -90, 0]} />
-          <Rug position={[10, 0, 6]} size={[2, 2.5]} color="#00ff41" />
-          <Rug position={[10, 0, -6]} size={[2, 2.5]} color="#00aaff" />
+          {/* Lounge area — sofa + Matrix rugs */}
+          <Sofa position={[10.5, 0, 6.5]} rotation={[0, -90, 0]} />
+          <Sofa position={[10.5, 0, -6.5]} rotation={[0, -90, 0]} />
+          <MatrixRug position={[10.5, 0, 6.5]} size={[2.5, 3]} seed={1} />
+          <MatrixRug position={[10.5, 0, -6.5]} size={[2.5, 3]} seed={2} />
+
+          {/* Matrix rugs under desk islands */}
+          <MatrixRug position={[-6.5, 0, -5]} size={[5, 2.5]} seed={3} />
+          <MatrixRug position={[-6.5, 0,  0]} size={[5, 2.5]} seed={4} />
+          <MatrixRug position={[-6.5, 0,  5]} size={[5, 2.5]} seed={5} />
+
+          {/* Matrix rug under conference table */}
+          <MatrixRug position={[7, 0, 0]} size={[5, 4]} seed={6} />
+
+          {/* Corridor rug */}
+          <MatrixRug position={[1.5, 0, 0]} size={[2, 6]} seed={7} />
 
           {/* Server rack near partition */}
           <ServerRack position={[0.5, 0, 7]} rotation={[0, -90, 0]} />
