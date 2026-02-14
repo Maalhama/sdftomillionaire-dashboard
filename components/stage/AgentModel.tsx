@@ -509,7 +509,7 @@ export default function AgentModel({
         groupRef.current.position.x = b.px;
         groupRef.current.position.z = b.pz;
         groupRef.current.position.y = Math.sin(t * 1.5 + b.bobPhase) * 0.01;
-        const toDx = 5.5 - b.meetingSeatX;
+        const toDx = 7 - b.meetingSeatX;
         const toDz = 0 - b.meetingSeatZ;
         b.targetRotY = Math.atan2(toDx, toDz);
         b.currentRotY = THREE.MathUtils.lerp(b.currentRotY, b.targetRotY, 0.04);

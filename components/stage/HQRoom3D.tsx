@@ -37,70 +37,94 @@ class Room3DErrorBoundary extends Component<{ children: ReactNode }, { hasError:
 }
 
 // ═══ CAMERA DEFAULTS ═══
-const DEFAULT_CAM_POS: [number, number, number] = [12, 18, 12];
-const DEFAULT_CAM_FOV = 38;
+const DEFAULT_CAM_POS: [number, number, number] = [16, 22, 16];
+const DEFAULT_CAM_FOV = 36;
 const DEFAULT_CAM_TARGET = new THREE.Vector3(0, 0, 0);
 
 // ═══ ROOM LAYOUT ═══
-// Office area: left side — 2 rows of 3 desks
-// Meeting area: right side — round table with seats
+// Real open-space office:
+//   Left: workspace with 3 desk islands (face-to-face pairs)
+//   Right: glass-walled conference room
+//   Decorations: plants, whiteboard, coffee station, bookshelf
 
-const WALL_HEIGHT = 2.5;
+const WALL_HEIGHT = 3.0;
 const WALL_COLOR = '#0d0d0d';
 const WALL_EMISSIVE = '#00ff41';
-const FLOOR_SIZE = { w: 20, d: 14 };
+const FLOOR_SIZE = { w: 26, d: 18 };
 
-// Office desk positions (left side, spacious 2x3 grid)
+// ═══ DESK ISLANDS ═══
+// Each island = 2 agents face-to-face across a shared desk surface
+// Island center positions:
+const ISLAND_CENTERS: [number, number, number][] = [
+  [-6.5, 0, -5],   // Island 1 (top)
+  [-6.5, 0,  0],   // Island 2 (middle)
+  [-6.5, 0,  5],   // Island 3 (bottom)
+];
+
+// Agent desk positions (where they sit/stand)
+// Left agent faces right (+x), right agent faces left (-x)
 const deskPositions: [number, number, number][] = [
-  [-6.5, 0, -3.5],  // CEO
-  [-6.5, 0, 0],     // KIRA
-  [-6.5, 0, 3.5],   // MADARA
-  [-3.5, 0, -3.5],  // STARK
-  [-3.5, 0, 0],     // L
-  [-3.5, 0, 3.5],   // USOPP
+  [-8.5, 0, -5],   // CEO — island 1 left
+  [-4.5, 0, -5],   // KIRA — island 1 right
+  [-8.5, 0,  0],   // MADARA — island 2 left
+  [-4.5, 0,  0],   // STARK — island 2 right
+  [-8.5, 0,  5],   // L — island 3 left
+  [-4.5, 0,  5],   // USOPP — island 3 right
 ];
 
-// Meeting table position (right side)
-const MEETING_TABLE_POS: [number, number, number] = [5.5, 0, 0];
+// Agent rotations (face each other across desk)
+const deskRotations: [number, number, number][] = [
+  [0, 90, 0],    // CEO faces right
+  [0, -90, 0],   // KIRA faces left
+  [0, 90, 0],    // MADARA faces right
+  [0, -90, 0],   // STARK faces left
+  [0, 90, 0],    // L faces right
+  [0, -90, 0],   // USOPP faces left
+];
 
-// Meeting seat positions around the table
+// ═══ MEETING ROOM ═══
+// Glass-walled conference room on the right side
+const MEETING_TABLE_POS: [number, number, number] = [7, 0, 0];
+const MEETING_TABLE_SIZE = { w: 3.0, d: 1.4 }; // rectangular
+
+// Meeting seats around rectangular table
 const meetingSeatPositions: [number, number, number][] = [
-  [5.5, 0, -2.2],   // seat 0 (front)
-  [7.2, 0, -1.1],   // seat 1
-  [7.2, 0, 1.1],    // seat 2
-  [5.5, 0, 2.2],    // seat 3 (back)
-  [3.8, 0, 1.1],    // seat 4
-  [3.8, 0, -1.1],   // seat 5
+  [5.2, 0, -0.9],   // seat 0 — left near
+  [5.2, 0,  0.9],   // seat 1 — left far
+  [7.0, 0, -1.5],   // seat 2 — end near
+  [8.8, 0, -0.9],   // seat 3 — right near
+  [8.8, 0,  0.9],   // seat 4 — right far
+  [7.0, 0,  1.5],   // seat 5 — end far
 ];
+
+// ═══ GLASS PARTITION ═══
+const PARTITION_X = 1.5;
+const DOOR_Z_MIN = -2.0;
+const DOOR_Z_MAX = 2.0;
 
 // ═══ COLLISION DATA ═══
-// Agent collision radius
 const AGENT_RADIUS = 0.4;
-const MIN_AGENT_DIST = AGENT_RADIUS * 2; // 0.8
+const MIN_AGENT_DIST = AGENT_RADIUS * 2;
 
-// Room walkable bounds (outer walls - agent radius padding)
 const ROOM_BOUNDS = {
-  minX: -FLOOR_SIZE.w / 2 + AGENT_RADIUS,  // -6.6
-  maxX: FLOOR_SIZE.w / 2 - AGENT_RADIUS,   //  6.6
-  minZ: -FLOOR_SIZE.d / 2 + AGENT_RADIUS,  // -4.6
-  maxZ: FLOOR_SIZE.d / 2 - AGENT_RADIUS,   //  4.6
+  minX: -FLOOR_SIZE.w / 2 + AGENT_RADIUS,
+  maxX:  FLOOR_SIZE.w / 2 - AGENT_RADIUS,
+  minZ: -FLOOR_SIZE.d / 2 + AGENT_RADIUS,
+  maxZ:  FLOOR_SIZE.d / 2 - AGENT_RADIUS,
 };
 
-// Divider wall (x=-0.5, door gap at z ∈ [-2, 2])
-const DIVIDER = { x: -0.5, doorZMin: -2, doorZMax: 2 };
+const DIVIDER = { x: PARTITION_X, doorZMin: DOOR_Z_MIN, doorZMax: DOOR_Z_MAX };
 
-// Meeting table circle collision (agents can sit around edge but not walk through center)
-const MEETING_TABLE_COLLISION = { x: 5.5, z: 0, radius: 1.0 };
+const MEETING_TABLE_COLLISION = { x: MEETING_TABLE_POS[0], z: MEETING_TABLE_POS[2], radius: 1.8 };
 
-// Obstacle AABBs — desks + chairs (padded by agent radius)
-// Each desk: table at [pos.x+0.4, pos.z], size 0.6×0.8, chair at [pos.x-0.3, pos.z]
-// Combined footprint ≈ center [pos.x+0.05, pos.z], extent 1.1 × 0.8 + padding
+// Obstacle AABBs — desk islands (padded by agent radius)
+// Each island: ~3.2 wide (x) × 1.2 deep (z)
 const OBSTACLE_BOXES: { minX: number; maxX: number; minZ: number; maxZ: number }[] =
-  deskPositions.map(pos => ({
-    minX: pos[0] - 0.6 - AGENT_RADIUS,
-    maxX: pos[0] + 1.0 + AGENT_RADIUS,
-    minZ: pos[2] - 0.5 - AGENT_RADIUS,
-    maxZ: pos[2] + 0.5 + AGENT_RADIUS,
+  ISLAND_CENTERS.map(pos => ({
+    minX: pos[0] - 1.8 - AGENT_RADIUS,
+    maxX: pos[0] + 1.8 + AGENT_RADIUS,
+    minZ: pos[2] - 0.7 - AGENT_RADIUS,
+    maxZ: pos[2] + 0.7 + AGENT_RADIUS,
   }));
 
 export interface CollisionData {
@@ -122,40 +146,41 @@ const COLLISION_DATA: CollisionData = {
 };
 
 // Shared agent positions array: 6 agents × 2 (x, z)
-// Written by each agent in useFrame, read by others for separation
 const SHARED_POSITIONS = new Float32Array(12);
 
-// Roam waypoints — positions scattered across both rooms for agents to walk through
+// Roam waypoints — spread across both rooms with clear corridors
 const ROAM_WAYPOINTS: [number, number, number][] = [
-  // Office area (left side)
-  [-8.5, 0, -5.5],   // back-left corner
-  [-8.5, 0, 5.5],    // front-left corner
-  [-5, 0, -1.5],     // between desk rows top
-  [-5, 0, 1.5],      // between desk rows bottom
-  [-1.5, 0, -5],     // right of desks top
-  [-1.5, 0, 5],      // right of desks bottom
-  [-1.5, 0, 0],      // center right of desks
-  [-8, 0, 0],        // far left center
-  [-5, 0, -5],       // office back corridor
-  [-5, 0, 5],        // office front corridor
-  // Doorway area
-  [-0.5, 0, 0],      // in the door
-  // Meeting room (right side)
-  [1.5, 0, -5],      // meeting room top-left
-  [1.5, 0, 5],       // meeting room bottom-left
-  [3.5, 0, -3],      // near table top-left
-  [7.5, 0, -3],      // near table top-right
-  [8, 0, 0],         // right of table
-  [7.5, 0, 3],       // near table bottom-right
-  [3.5, 0, 3],       // near table bottom-left
-  [8.5, 0, -5.5],    // meeting room top-right corner
-  [8.5, 0, 5.5],     // meeting room bottom-right corner
-  [1.5, 0, 0],       // meeting room left center
-  [5.5, 0, 5],       // meeting room far bottom
-  [5.5, 0, -5],      // meeting room far top
+  // ── Workspace corridors ──
+  [-11, 0, -7.5],   // far top-left
+  [-11, 0,  7.5],   // far bottom-left
+  [-2,  0, -7.5],   // near top-left
+  [-2,  0,  7.5],   // near bottom-left
+  [-6.5, 0, -2.5],  // between island 1 & 2
+  [-6.5, 0,  2.5],  // between island 2 & 3
+  [-2,  0, -5],     // corridor right of desks top
+  [-2,  0,  0],     // corridor right of desks middle
+  [-2,  0,  5],     // corridor right of desks bottom
+  [-11, 0, -2.5],   // left wall corridor
+  [-11, 0,  2.5],   // left wall corridor
+  [-6.5, 0, -7.5],  // behind island 1
+  [-6.5, 0,  7.5],  // behind island 3
+  // ── Doorway area ──
+  [1.5, 0,  0],     // in the door
+  // ── Conference room ──
+  [3.5, 0, -6],     // conference top-left
+  [3.5, 0,  6],     // conference bottom-left
+  [10,  0, -6],     // conference top-right
+  [10,  0,  6],     // conference bottom-right
+  [4,   0, -3],     // near table left-top
+  [10,  0, -3],     // far right top
+  [4,   0,  3],     // near table left-bottom
+  [10,  0,  3],     // far right bottom
+  [11,  0,  0],     // far right center
+  [7,   0, -6],     // conference back
+  [7,   0,  6],     // conference front
 ];
 
-// Agent configs — positions are at their desks
+// Agent configs
 const agentConfigs = [
   {
     id: 'opus',
@@ -163,9 +188,9 @@ const agentConfigs = [
     role: 'CEO // Chef des Opérations',
     model: '/models/minion.glb',
     hasModel: true,
-    deskIndex: 4,
-    position: deskPositions[4],
-    rotation: [0, 90, 0] as [number, number, number],
+    deskIndex: 0,
+    position: deskPositions[0],
+    rotation: deskRotations[0],
     status: 'working' as AgentStatus,
     color: '#f59e0b',
     thought: 'Review des propositions...',
@@ -178,7 +203,7 @@ const agentConfigs = [
     hasModel: true,
     deskIndex: 1,
     position: deskPositions[1],
-    rotation: [0, 90, 0] as [number, number, number],
+    rotation: deskRotations[1],
     status: 'working' as AgentStatus,
     color: '#8b5cf6',
     thought: 'Validation des findings',
@@ -191,7 +216,7 @@ const agentConfigs = [
     hasModel: true,
     deskIndex: 2,
     position: deskPositions[2],
-    rotation: [0, 90, 0] as [number, number, number],
+    rotation: deskRotations[2],
     status: 'idle' as AgentStatus,
     color: '#22c55e',
     thought: 'En attente ; prochain: Standup',
@@ -204,7 +229,7 @@ const agentConfigs = [
     hasModel: true,
     deskIndex: 3,
     position: deskPositions[3],
-    rotation: [0, 90, 0] as [number, number, number],
+    rotation: deskRotations[3],
     status: 'idle' as AgentStatus,
     color: '#ec4899',
     thought: 'Brainstorm headlines',
@@ -215,9 +240,9 @@ const agentConfigs = [
     role: 'L // Directeur Réseaux Sociaux',
     model: '/models/xalt.glb',
     hasModel: true,
-    deskIndex: 0,
-    position: deskPositions[0],
-    rotation: [0, 90, 0] as [number, number, number],
+    deskIndex: 4,
+    position: deskPositions[4],
+    rotation: deskRotations[4],
     status: 'idle' as AgentStatus,
     color: '#3b82f6',
     thought: 'Review coordination auto',
@@ -230,7 +255,7 @@ const agentConfigs = [
     hasModel: true,
     deskIndex: 5,
     position: deskPositions[5],
-    rotation: [0, 90, 0] as [number, number, number],
+    rotation: deskRotations[5],
     status: 'idle' as AgentStatus,
     color: '#ef4444',
     thought: 'Surveillance active',
@@ -239,7 +264,7 @@ const agentConfigs = [
 
 // ═══ ROOM COMPONENTS ═══
 
-// Wall segment
+// Outer wall segment
 function Wall({ start, end, height = WALL_HEIGHT }: { start: [number, number]; end: [number, number]; height?: number }) {
   const dx = end[0] - start[0];
   const dz = end[1] - start[1];
@@ -250,19 +275,19 @@ function Wall({ start, end, height = WALL_HEIGHT }: { start: [number, number]; e
 
   return (
     <mesh position={[cx, height / 2, cz]} rotation={[0, angle, 0]}>
-      <boxGeometry args={[0.08, height, length]} />
+      <boxGeometry args={[0.1, height, length]} />
       <meshStandardMaterial
         color={WALL_COLOR}
         emissive={WALL_EMISSIVE}
-        emissiveIntensity={0.02}
+        emissiveIntensity={0.015}
         transparent
-        opacity={0.85}
+        opacity={0.9}
       />
     </mesh>
   );
 }
 
-// Neon strip on top of walls
+// Neon accent strip on top of walls
 function NeonStrip({ start, end }: { start: [number, number]; end: [number, number] }) {
   const dx = end[0] - start[0];
   const dz = end[1] - start[1];
@@ -275,27 +300,23 @@ function NeonStrip({ start, end }: { start: [number, number]; end: [number, numb
     <group>
       <mesh position={[cx, WALL_HEIGHT + 0.02, cz]} rotation={[0, angle, 0]}>
         <boxGeometry args={[0.12, 0.04, length]} />
-        <meshBasicMaterial color={WALL_EMISSIVE} transparent opacity={0.6} />
+        <meshBasicMaterial color={WALL_EMISSIVE} transparent opacity={0.5} />
       </mesh>
-      <pointLight position={[cx, WALL_HEIGHT + 0.1, cz]} color={WALL_EMISSIVE} intensity={0.3} distance={3} />
+      <pointLight position={[cx, WALL_HEIGHT + 0.1, cz]} color={WALL_EMISSIVE} intensity={0.2} distance={3} />
     </group>
   );
 }
 
-// Room structure with walls
+// Room outer walls
 function RoomWalls() {
-  // Outer walls
-  const outerWalls: [number, number][][] = [
-    [[-FLOOR_SIZE.w / 2, -FLOOR_SIZE.d / 2], [FLOOR_SIZE.w / 2, -FLOOR_SIZE.d / 2]],   // front
-    [[FLOOR_SIZE.w / 2, -FLOOR_SIZE.d / 2], [FLOOR_SIZE.w / 2, FLOOR_SIZE.d / 2]],      // right
-    [[FLOOR_SIZE.w / 2, FLOOR_SIZE.d / 2], [-FLOOR_SIZE.w / 2, FLOOR_SIZE.d / 2]],      // back
-    [[-FLOOR_SIZE.w / 2, FLOOR_SIZE.d / 2], [-FLOOR_SIZE.w / 2, -FLOOR_SIZE.d / 2]],    // left
-  ];
+  const hw = FLOOR_SIZE.w / 2;
+  const hd = FLOOR_SIZE.d / 2;
 
-  // Divider wall between office and meeting room (with gap for door)
-  const dividerWalls: [number, number][][] = [
-    [[-0.5, -FLOOR_SIZE.d / 2], [-0.5, -2]],  // divider top part
-    [[-0.5, 2], [-0.5, FLOOR_SIZE.d / 2]],     // divider bottom part
+  const outerWalls: [number, number][][] = [
+    [[-hw, -hd], [hw, -hd]],   // front
+    [[hw, -hd], [hw, hd]],      // right
+    [[hw, hd], [-hw, hd]],      // back
+    [[-hw, hd], [-hw, -hd]],    // left
   ];
 
   return (
@@ -306,126 +327,448 @@ function RoomWalls() {
           <NeonStrip start={wall[0]} end={wall[1]} />
         </group>
       ))}
-      {dividerWalls.map((wall, i) => (
-        <group key={`divider-${i}`}>
-          <Wall start={wall[0]} end={wall[1]} height={2} />
-          <NeonStrip start={wall[0]} end={wall[1]} />
-        </group>
-      ))}
     </group>
   );
 }
 
-// Office desk (facing right)
-function Desk({ position, color }: { position: [number, number, number]; color: string }) {
+// ═══ GLASS PARTITION ═══
+// Separates workspace from conference room — transparent with frame
+function GlassPartition() {
+  const hd = FLOOR_SIZE.d / 2;
+  const glassH = WALL_HEIGHT - 0.3; // slightly shorter than walls
+  const frameColor = '#1a1a1a';
+
+  // Top segment (above door)
+  const topLen = hd - Math.abs(DOOR_Z_MIN);
+  const topCz = (-hd + DOOR_Z_MIN) / 2;
+  // Bottom segment (below door)
+  const botLen = hd - DOOR_Z_MAX;
+  const botCz = (hd + DOOR_Z_MAX) / 2;
+
   return (
-    <group position={position}>
-      {/* Table top */}
-      <mesh position={[0.4, 0.45, 0]}>
-        <boxGeometry args={[0.6, 0.04, 0.8]} />
-        <meshStandardMaterial color="#111111" emissive={color} emissiveIntensity={0.03} />
+    <group>
+      {/* Top glass panel */}
+      <mesh position={[PARTITION_X, glassH / 2, topCz]}>
+        <boxGeometry args={[0.06, glassH, topLen]} />
+        <meshPhysicalMaterial
+          color="#0a1a0a"
+          transparent
+          opacity={0.2}
+          roughness={0.1}
+          metalness={0.1}
+          side={THREE.DoubleSide}
+        />
       </mesh>
-      {/* Legs */}
-      {[[0.15, 0.22, -0.35], [0.65, 0.22, -0.35], [0.15, 0.22, 0.35], [0.65, 0.22, 0.35]].map((pos, i) => (
-        <mesh key={i} position={pos as [number, number, number]}>
-          <boxGeometry args={[0.03, 0.44, 0.03]} />
-          <meshStandardMaterial color="#1a1a1a" />
+      {/* Top frame */}
+      <mesh position={[PARTITION_X, glassH, topCz]}>
+        <boxGeometry args={[0.08, 0.05, topLen]} />
+        <meshStandardMaterial color={frameColor} />
+      </mesh>
+
+      {/* Bottom glass panel */}
+      <mesh position={[PARTITION_X, glassH / 2, botCz]}>
+        <boxGeometry args={[0.06, glassH, botLen]} />
+        <meshPhysicalMaterial
+          color="#0a1a0a"
+          transparent
+          opacity={0.2}
+          roughness={0.1}
+          metalness={0.1}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* Bottom frame */}
+      <mesh position={[PARTITION_X, glassH, botCz]}>
+        <boxGeometry args={[0.08, 0.05, botLen]} />
+        <meshStandardMaterial color={frameColor} />
+      </mesh>
+
+      {/* Door frame posts */}
+      {[DOOR_Z_MIN, DOOR_Z_MAX].map((z, i) => (
+        <mesh key={`doorpost-${i}`} position={[PARTITION_X, glassH / 2, z]}>
+          <boxGeometry args={[0.1, glassH, 0.08]} />
+          <meshStandardMaterial color={frameColor} emissive={WALL_EMISSIVE} emissiveIntensity={0.05} />
         </mesh>
       ))}
-      {/* Monitor */}
-      <mesh position={[0.6, 0.7, 0]}>
-        <boxGeometry args={[0.02, 0.3, 0.45]} />
-        <meshStandardMaterial color="#0a0a0a" emissive={color} emissiveIntensity={0.2} />
+
+      {/* Door header beam */}
+      <mesh position={[PARTITION_X, glassH, 0]}>
+        <boxGeometry args={[0.1, 0.06, DOOR_Z_MAX - DOOR_Z_MIN]} />
+        <meshStandardMaterial color={frameColor} emissive={WALL_EMISSIVE} emissiveIntensity={0.03} />
       </mesh>
-      {/* Screen glow */}
-      <pointLight color={color} intensity={0.2} distance={1.2} position={[0.5, 0.7, 0]} />
+
+      {/* Green neon strip along partition top */}
+      <mesh position={[PARTITION_X, glassH + 0.04, 0]}>
+        <boxGeometry args={[0.04, 0.02, FLOOR_SIZE.d]} />
+        <meshBasicMaterial color={WALL_EMISSIVE} transparent opacity={0.4} />
+      </mesh>
     </group>
   );
 }
 
-// Office chair
-function Chair({ position, color }: { position: [number, number, number]; color: string }) {
+// ═══ DESK ISLAND ═══
+// Shared double desk with center divider, 2 monitors, cable tray
+function DeskIsland({ position, colorLeft, colorRight }: {
+  position: [number, number, number];
+  colorLeft: string;
+  colorRight: string;
+}) {
+  const deskW = 3.2;  // total width (x)
+  const deskD = 1.2;  // depth (z)
+  const deskH = 0.72; // standard desk height
+  const legInset = 0.15;
+
   return (
     <group position={position}>
-      {/* Seat */}
-      <mesh position={[0, 0.3, 0]}>
-        <boxGeometry args={[0.35, 0.04, 0.35]} />
-        <meshStandardMaterial color="#0a0a0a" emissive={color} emissiveIntensity={0.05} />
+      {/* ── Desktop surface ── */}
+      <mesh position={[0, deskH, 0]}>
+        <boxGeometry args={[deskW, 0.04, deskD]} />
+        <meshStandardMaterial color="#111111" roughness={0.6} metalness={0.2} />
       </mesh>
-      {/* Back */}
-      <mesh position={[-0.15, 0.5, 0]}>
-        <boxGeometry args={[0.04, 0.35, 0.3]} />
+
+      {/* ── Center divider screen ── */}
+      <mesh position={[0, deskH + 0.2, 0]}>
+        <boxGeometry args={[0.03, 0.38, deskD * 0.85]} />
+        <meshStandardMaterial color="#1a1a1a" emissive="#003300" emissiveIntensity={0.05} />
+      </mesh>
+
+      {/* ── Legs (4 corner + 2 center support) ── */}
+      {[
+        [-deskW / 2 + legInset, deskH / 2, -deskD / 2 + legInset],
+        [-deskW / 2 + legInset, deskH / 2,  deskD / 2 - legInset],
+        [ deskW / 2 - legInset, deskH / 2, -deskD / 2 + legInset],
+        [ deskW / 2 - legInset, deskH / 2,  deskD / 2 - legInset],
+      ].map((pos, i) => (
+        <mesh key={`leg-${i}`} position={pos as [number, number, number]}>
+          <boxGeometry args={[0.04, deskH, 0.04]} />
+          <meshStandardMaterial color="#222" metalness={0.5} />
+        </mesh>
+      ))}
+
+      {/* ── Side panels (modesty panels) ── */}
+      {[-1, 1].map((side, i) => (
+        <mesh key={`panel-${i}`} position={[side * (deskW / 2 - 0.02), deskH / 2 + 0.05, 0]}>
+          <boxGeometry args={[0.03, deskH * 0.6, deskD * 0.9]} />
+          <meshStandardMaterial color="#0f0f0f" />
+        </mesh>
+      ))}
+
+      {/* ── Cable tray underneath ── */}
+      <mesh position={[0, 0.15, 0]}>
+        <boxGeometry args={[deskW * 0.6, 0.03, 0.15]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+
+      {/* ── Left monitor (facing right) ── */}
+      <group position={[-0.4, deskH + 0.04, 0]}>
+        {/* Stand */}
+        <mesh position={[0, 0.12, 0]}>
+          <cylinderGeometry args={[0.02, 0.04, 0.24, 8]} />
+          <meshStandardMaterial color="#1a1a1a" metalness={0.6} />
+        </mesh>
+        {/* Screen */}
+        <mesh position={[0, 0.35, 0]}>
+          <boxGeometry args={[0.03, 0.35, 0.55]} />
+          <meshStandardMaterial color="#050505" emissive={colorLeft} emissiveIntensity={0.15} />
+        </mesh>
+        <pointLight color={colorLeft} intensity={0.15} distance={1.5} position={[-0.2, 0.35, 0]} />
+      </group>
+
+      {/* ── Right monitor (facing left) ── */}
+      <group position={[0.4, deskH + 0.04, 0]}>
+        <mesh position={[0, 0.12, 0]}>
+          <cylinderGeometry args={[0.02, 0.04, 0.24, 8]} />
+          <meshStandardMaterial color="#1a1a1a" metalness={0.6} />
+        </mesh>
+        <mesh position={[0, 0.35, 0]}>
+          <boxGeometry args={[0.03, 0.35, 0.55]} />
+          <meshStandardMaterial color="#050505" emissive={colorRight} emissiveIntensity={0.15} />
+        </mesh>
+        <pointLight color={colorRight} intensity={0.15} distance={1.5} position={[0.2, 0.35, 0]} />
+      </group>
+
+      {/* ── Keyboard hints (subtle) ── */}
+      {[-0.8, 0.8].map((x, i) => (
+        <mesh key={`kb-${i}`} position={[x, deskH + 0.025, 0]}>
+          <boxGeometry args={[0.35, 0.01, 0.15]} />
+          <meshStandardMaterial color="#0a0a0a" />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+// ═══ OFFICE CHAIR ═══
+function Chair({ position, color, faceRight }: {
+  position: [number, number, number];
+  color: string;
+  faceRight?: boolean;
+}) {
+  const dir = faceRight ? 1 : -1;
+  return (
+    <group position={position}>
+      {/* Base star */}
+      <mesh position={[0, 0.05, 0]}>
+        <cylinderGeometry args={[0.25, 0.25, 0.03, 5]} />
+        <meshStandardMaterial color="#1a1a1a" metalness={0.6} />
+      </mesh>
+      {/* Piston */}
+      <mesh position={[0, 0.2, 0]}>
+        <cylinderGeometry args={[0.03, 0.03, 0.3, 8]} />
+        <meshStandardMaterial color="#222" metalness={0.5} />
+      </mesh>
+      {/* Seat */}
+      <mesh position={[0, 0.35, 0]}>
+        <boxGeometry args={[0.4, 0.05, 0.4]} />
         <meshStandardMaterial color="#0a0a0a" emissive={color} emissiveIntensity={0.03} />
       </mesh>
-      {/* Base */}
-      <mesh position={[0, 0.15, 0]}>
-        <cylinderGeometry args={[0.03, 0.03, 0.3, 8]} />
-        <meshStandardMaterial color="#1a1a1a" />
+      {/* Backrest */}
+      <mesh position={[-dir * 0.18, 0.55, 0]}>
+        <boxGeometry args={[0.05, 0.35, 0.35]} />
+        <meshStandardMaterial color="#0a0a0a" emissive={color} emissiveIntensity={0.02} />
       </mesh>
     </group>
   );
 }
 
-// Meeting table (round)
-function MeetingTable({ position }: { position: [number, number, number] }) {
+// ═══ CONFERENCE TABLE ═══
+// Rectangular table with rounded edges and power hub
+function ConferenceTable({ position }: { position: [number, number, number] }) {
+  const tw = MEETING_TABLE_SIZE.w;
+  const td = MEETING_TABLE_SIZE.d;
+
   return (
     <group position={position}>
       {/* Table top */}
-      <mesh position={[0, 0.5, 0]}>
-        <cylinderGeometry args={[1.2, 1.2, 0.05, 32]} />
-        <meshStandardMaterial color="#0d0d0d" emissive="#00ff41" emissiveIntensity={0.03} />
+      <mesh position={[0, 0.72, 0]}>
+        <boxGeometry args={[tw, 0.05, td]} />
+        <meshStandardMaterial color="#0d0d0d" roughness={0.3} metalness={0.3} emissive="#003300" emissiveIntensity={0.02} />
       </mesh>
-      {/* Central pillar */}
-      <mesh position={[0, 0.25, 0]}>
-        <cylinderGeometry args={[0.1, 0.15, 0.5, 8]} />
-        <meshStandardMaterial color="#1a1a1a" />
+      {/* Table legs (4 corners) */}
+      {[
+        [-tw / 2 + 0.2, 0.36, -td / 2 + 0.15],
+        [-tw / 2 + 0.2, 0.36,  td / 2 - 0.15],
+        [ tw / 2 - 0.2, 0.36, -td / 2 + 0.15],
+        [ tw / 2 - 0.2, 0.36,  td / 2 - 0.15],
+      ].map((pos, i) => (
+        <mesh key={`tleg-${i}`} position={pos as [number, number, number]}>
+          <boxGeometry args={[0.06, 0.72, 0.06]} />
+          <meshStandardMaterial color="#1a1a1a" metalness={0.5} />
+        </mesh>
+      ))}
+      {/* Center power/data hub */}
+      <mesh position={[0, 0.76, 0]}>
+        <cylinderGeometry args={[0.12, 0.12, 0.04, 16]} />
+        <meshStandardMaterial color="#111" emissive="#00ff41" emissiveIntensity={0.1} />
       </mesh>
-      {/* Hologram projector on table */}
-      <mesh position={[0, 0.55, 0]}>
-        <cylinderGeometry args={[0.08, 0.08, 0.03, 16]} />
-        <meshBasicMaterial color="#00ff41" transparent opacity={0.5} />
-      </mesh>
-      <pointLight position={[0, 0.8, 0]} color="#00ff41" intensity={0.4} distance={3} />
-      {/* Neon ring on floor */}
+      {/* Hologram glow */}
+      <pointLight position={[0, 1.0, 0]} color="#00ff41" intensity={0.3} distance={3} />
+      {/* Neon outline on floor */}
       <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[1.4, 1.5, 32]} />
-        <meshBasicMaterial color="#00ff41" transparent opacity={0.1} side={THREE.DoubleSide} />
+        <ringGeometry args={[2.0, 2.1, 32]} />
+        <meshBasicMaterial color="#00ff41" transparent opacity={0.06} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
 }
 
-// Floor with grid
+// ═══ DECORATIVE ELEMENTS ═══
+
+// Office plant — pot with foliage
+function Plant({ position, size = 1 }: { position: [number, number, number]; size?: number }) {
+  return (
+    <group position={position} scale={[size, size, size]}>
+      {/* Pot */}
+      <mesh position={[0, 0.2, 0]}>
+        <cylinderGeometry args={[0.2, 0.15, 0.4, 12]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.8} />
+      </mesh>
+      {/* Soil */}
+      <mesh position={[0, 0.41, 0]}>
+        <cylinderGeometry args={[0.18, 0.18, 0.02, 12]} />
+        <meshStandardMaterial color="#1a0f0a" />
+      </mesh>
+      {/* Foliage (stacked spheres) */}
+      <mesh position={[0, 0.75, 0]}>
+        <sphereGeometry args={[0.3, 12, 12]} />
+        <meshStandardMaterial color="#0a2a0a" emissive="#00ff41" emissiveIntensity={0.02} />
+      </mesh>
+      <mesh position={[0.1, 0.95, 0.05]}>
+        <sphereGeometry args={[0.2, 10, 10]} />
+        <meshStandardMaterial color="#0a3a0a" emissive="#00ff41" emissiveIntensity={0.03} />
+      </mesh>
+      <mesh position={[-0.08, 0.9, -0.08]}>
+        <sphereGeometry args={[0.22, 10, 10]} />
+        <meshStandardMaterial color="#082a08" emissive="#00ff41" emissiveIntensity={0.02} />
+      </mesh>
+      {/* Subtle green glow */}
+      <pointLight position={[0, 0.8, 0]} color="#00ff41" intensity={0.05} distance={2} />
+    </group>
+  );
+}
+
+// Whiteboard on wall
+function Whiteboard({ position, rotation = [0, 0, 0] }: {
+  position: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  return (
+    <group position={position} rotation={rotation.map(r => r * Math.PI / 180) as unknown as THREE.Euler}>
+      {/* Board frame */}
+      <mesh position={[0, 0, 0]}>
+        <boxGeometry args={[2.0, 1.2, 0.05]} />
+        <meshStandardMaterial color="#222" />
+      </mesh>
+      {/* White surface */}
+      <mesh position={[0, 0, 0.03]}>
+        <boxGeometry args={[1.85, 1.05, 0.01]} />
+        <meshStandardMaterial color="#111" emissive="#00ff41" emissiveIntensity={0.02} />
+      </mesh>
+      {/* Marker tray */}
+      <mesh position={[0, -0.65, 0.08]}>
+        <boxGeometry args={[1.0, 0.05, 0.08]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+    </group>
+  );
+}
+
+// Bookshelf against wall
+function Bookshelf({ position, rotation = [0, 0, 0] }: {
+  position: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  const shelfW = 1.5;
+  const shelfH = 2.0;
+  const shelfD = 0.35;
+  const shelves = 4;
+
+  return (
+    <group position={position} rotation={rotation.map(r => r * Math.PI / 180) as unknown as THREE.Euler}>
+      {/* Back panel */}
+      <mesh position={[0, shelfH / 2, 0]}>
+        <boxGeometry args={[shelfW, shelfH, 0.03]} />
+        <meshStandardMaterial color="#111" />
+      </mesh>
+      {/* Side panels */}
+      {[-1, 1].map((side, i) => (
+        <mesh key={`side-${i}`} position={[side * shelfW / 2, shelfH / 2, shelfD / 2]}>
+          <boxGeometry args={[0.03, shelfH, shelfD]} />
+          <meshStandardMaterial color="#111" />
+        </mesh>
+      ))}
+      {/* Shelves */}
+      {Array.from({ length: shelves }).map((_, i) => (
+        <mesh key={`shelf-${i}`} position={[0, (i + 0.5) * (shelfH / shelves), shelfD / 2]}>
+          <boxGeometry args={[shelfW, 0.03, shelfD]} />
+          <meshStandardMaterial color="#111" />
+        </mesh>
+      ))}
+      {/* Books (colored blocks) */}
+      {[
+        [0.3, 0.85, '#1a3a1a'],
+        [-0.2, 0.85, '#2a1a1a'],
+        [0.5, 0.85, '#1a1a3a'],
+        [-0.4, 1.35, '#3a2a1a'],
+        [0.1, 1.35, '#1a2a2a'],
+        [0.4, 1.35, '#2a1a2a'],
+        [-0.3, 1.85, '#1a3a2a'],
+        [0.2, 1.85, '#2a2a1a'],
+      ].map(([x, y, c], i) => (
+        <mesh key={`book-${i}`} position={[x as number, y as number, shelfD / 2]}>
+          <boxGeometry args={[0.12, 0.25, 0.2]} />
+          <meshStandardMaterial color={c as string} emissive={c as string} emissiveIntensity={0.03} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+// Coffee station
+function CoffeeStation({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      {/* Counter */}
+      <mesh position={[0, 0.5, 0]}>
+        <boxGeometry args={[1.2, 1.0, 0.6]} />
+        <meshStandardMaterial color="#111" roughness={0.4} metalness={0.3} />
+      </mesh>
+      {/* Counter top */}
+      <mesh position={[0, 1.01, 0]}>
+        <boxGeometry args={[1.3, 0.03, 0.7]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.2} metalness={0.4} />
+      </mesh>
+      {/* Coffee machine */}
+      <mesh position={[0.2, 1.25, 0]}>
+        <boxGeometry args={[0.3, 0.45, 0.25]} />
+        <meshStandardMaterial color="#0a0a0a" emissive="#00ff41" emissiveIntensity={0.08} />
+      </mesh>
+      {/* Machine light */}
+      <pointLight position={[0.2, 1.3, 0.2]} color="#00ff41" intensity={0.08} distance={1} />
+      {/* Cup */}
+      <mesh position={[-0.3, 1.1, 0.05]}>
+        <cylinderGeometry args={[0.05, 0.04, 0.1, 8]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+    </group>
+  );
+}
+
+// Ceiling strip light
+function CeilingLight({ position, length, axis = 'x' }: {
+  position: [number, number, number];
+  length: number;
+  axis?: 'x' | 'z';
+}) {
+  return (
+    <group position={position}>
+      {/* Housing */}
+      <mesh rotation={axis === 'z' ? [0, Math.PI / 2, 0] : [0, 0, 0]}>
+        <boxGeometry args={[length, 0.04, 0.15]} />
+        <meshStandardMaterial color="#111" />
+      </mesh>
+      {/* Light strip */}
+      <mesh position={[0, -0.03, 0]} rotation={axis === 'z' ? [0, Math.PI / 2, 0] : [0, 0, 0]}>
+        <boxGeometry args={[length - 0.1, 0.01, 0.08]} />
+        <meshBasicMaterial color="#ccddcc" transparent opacity={0.6} />
+      </mesh>
+      {/* Actual light */}
+      <pointLight position={[0, -0.1, 0]} color="#ddeedd" intensity={0.6} distance={6} />
+    </group>
+  );
+}
+
+// Floor with subtle grid
 function RoomFloor() {
   return (
     <>
       <Grid
         args={[FLOOR_SIZE.w, FLOOR_SIZE.d]}
-        cellSize={0.5}
-        cellThickness={0.4}
+        cellSize={1}
+        cellThickness={0.3}
         cellColor="#00ff41"
-        sectionSize={2}
-        sectionThickness={0.8}
+        sectionSize={4}
+        sectionThickness={0.5}
         sectionColor="#00ff41"
-        fadeDistance={12}
-        fadeStrength={1.5}
+        fadeDistance={18}
+        fadeStrength={2}
         position={[0, 0, 0]}
       />
       {/* Dark floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
         <planeGeometry args={[FLOOR_SIZE.w, FLOOR_SIZE.d]} />
-        <meshStandardMaterial color="#050505" />
+        <meshStandardMaterial color="#060606" roughness={0.8} />
       </mesh>
-      {/* Ceiling (subtle) */}
+      {/* Ceiling */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, WALL_HEIGHT, 0]}>
         <planeGeometry args={[FLOOR_SIZE.w, FLOOR_SIZE.d]} />
-        <meshStandardMaterial color="#030303" transparent opacity={0.5} />
+        <meshStandardMaterial color="#040404" transparent opacity={0.6} />
       </mesh>
     </>
   );
 }
 
-// Room labels
+// Room label
 function RoomLabel({ text, position }: { text: string; position: [number, number, number] }) {
   return (
     <Html position={position} center style={{ pointerEvents: 'none' }}>
@@ -436,9 +779,18 @@ function RoomLabel({ text, position }: { text: string; position: [number, number
   );
 }
 
+// Floor ring under agents at desk
+function FloorRing({ position, color }: { position: [number, number, number]; color: string }) {
+  return (
+    <mesh position={[position[0], 0.02, position[2]]} rotation={[-Math.PI / 2, 0, 0]}>
+      <ringGeometry args={[0.4, 0.55, 32]} />
+      <meshBasicMaterial color={color} transparent opacity={0.12} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
+
 // ═══ BUBBLE COMPONENTS ═══
 
-// Sleep bubble for idle agents — tiny "Zz" clickable, expands to full
 function SleepBubble({ position, name, color }: { position: [number, number, number]; name: string; color: string }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -529,19 +881,10 @@ function SleepBubble({ position, name, color }: { position: [number, number, num
   );
 }
 
-// Speech bubble — tiny dot by default, expands to Habbo style on click
 function SpeechBubble({
-  name,
-  color,
-  thought,
-  status,
-  position,
+  name, color, thought, status, position,
 }: {
-  name: string;
-  color: string;
-  thought: string;
-  status: string;
-  position: [number, number, number];
+  name: string; color: string; thought: string; status: string; position: [number, number, number];
 }) {
   const [expanded, setExpanded] = useState(false);
   const displayText = status === 'discussing' ? '💬 ' + thought : thought;
@@ -550,7 +893,6 @@ function SpeechBubble({
   return (
     <Html position={[position[0], position[1] + 2.2, position[2]]} center style={{ pointerEvents: 'auto' }}>
       {!expanded ? (
-        /* Mini bubble — tiny Matrix-style pill */
         <div
           onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
           className="cursor-pointer select-none"
@@ -568,11 +910,7 @@ function SpeechBubble({
           <span className="font-mono" style={{ fontSize: '6px', fontWeight: 700, color }}>{name}</span>
         </div>
       ) : (
-        /* Expanded Habbo-style bubble */
-        <div
-          className="select-none"
-          style={{ animation: 'bubbleExpand 0.25s ease-out forwards' }}
-        >
+        <div className="select-none" style={{ animation: 'bubbleExpand 0.25s ease-out forwards' }}>
           <div
             style={{
               background: '#fffef5',
@@ -584,32 +922,19 @@ function SpeechBubble({
               position: 'relative',
             }}
           >
-            {/* Close button */}
             <div
               onClick={(e) => { e.stopPropagation(); setExpanded(false); }}
               className="cursor-pointer"
               style={{
-                position: 'absolute',
-                top: '-6px',
-                right: '-6px',
-                width: '14px',
-                height: '14px',
-                borderRadius: '50%',
-                background: '#222',
-                border: '1.5px solid #444',
-                color: '#fff',
-                fontSize: '8px',
-                lineHeight: '12px',
-                textAlign: 'center',
+                position: 'absolute', top: '-6px', right: '-6px',
+                width: '14px', height: '14px', borderRadius: '50%',
+                background: '#222', border: '1.5px solid #444',
+                color: '#fff', fontSize: '8px', lineHeight: '12px', textAlign: 'center',
               }}
             >
               ✕
             </div>
-            {/* Agent name */}
-            <div className="font-mono text-[10px] font-bold" style={{ color, marginBottom: '2px' }}>
-              {name}
-            </div>
-            {/* Thought text */}
+            <div className="font-mono text-[10px] font-bold" style={{ color, marginBottom: '2px' }}>{name}</div>
             <div
               className="font-sans text-[10px] leading-tight"
               style={{
@@ -622,16 +947,11 @@ function SpeechBubble({
             >
               {displayText}
             </div>
-            {/* Status dot */}
             <div className="flex items-center gap-1 mt-1">
-              <span
-                className="inline-block w-1.5 h-1.5 rounded-full"
-                style={{ backgroundColor: color, boxShadow: `0 0 4px ${color}` }}
-              />
+              <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color, boxShadow: `0 0 4px ${color}` }} />
               <span className="font-mono text-[8px] uppercase" style={{ color: '#666' }}>{status}</span>
             </div>
           </div>
-          {/* Triangle pointer */}
           <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '8px solid #222', margin: '0 auto', position: 'relative', top: '-1px' }} />
           <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '7px solid #fffef5', margin: '-9px auto 0', position: 'relative' }} />
         </div>
@@ -646,33 +966,15 @@ function SpeechBubble({
   );
 }
 
-// Floor ring at desk
-function FloorRing({ position, color }: { position: [number, number, number]; color: string }) {
-  return (
-    <mesh position={[position[0], 0.02, position[2]]} rotation={[-Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[0.4, 0.55, 32]} />
-      <meshBasicMaterial color={color} transparent opacity={0.12} side={THREE.DoubleSide} />
-    </mesh>
-  );
-}
-
-// All agent positions for interaction system
+// ═══ AGENT STATION ═══
 const allDeskPositions = agentConfigs.map(c => c.position);
 
-// Agent with desk, bubbles
-function AgentStation({
-  config, configIndex,
-}: {
-  config: typeof agentConfigs[0]; configIndex: number;
-}) {
-  // Bubble logic: idle → SleepBubble (desk), working → SpeechBubble (desk),
-  // discussing → SpeechBubble (table position), roaming → no bubble
+function AgentStation({ config, configIndex }: { config: typeof agentConfigs[0]; configIndex: number }) {
   const showSleepBubble = config.status === 'idle';
   const showSpeechBubble = config.status === 'working' || config.status === 'discussing';
 
   return (
     <>
-      {/* 3D Model */}
       <AgentModel
         modelPath={config.model}
         position={config.position}
@@ -689,16 +991,19 @@ function AgentStation({
         totalAgents={6}
       />
 
-      {/* Desk */}
-      <Desk position={config.position} color={config.color} />
-
       {/* Chair at desk */}
-      <Chair position={[config.position[0] - 0.3, 0, config.position[2]]} color={config.color} />
+      <Chair
+        position={[
+          config.position[0] + (configIndex % 2 === 0 ? -0.6 : 0.6),
+          0,
+          config.position[2],
+        ]}
+        color={config.color}
+        faceRight={configIndex % 2 === 0}
+      />
 
-      {/* Floor ring */}
       <FloorRing position={config.position} color={config.color} />
 
-      {/* Bubbles based on status */}
       {showSleepBubble && (
         <SleepBubble position={config.position} name={config.name} color={config.color} />
       )}
@@ -717,15 +1022,15 @@ function AgentStation({
   );
 }
 
-// Camera controller with reset support
+// ═══ CAMERA ═══
 function CameraControls({ controlsRef }: { controlsRef: React.RefObject<any> }) {
   return (
     <OrbitControls
       ref={controlsRef}
       enablePan={false}
       enableZoom={true}
-      minDistance={14}
-      maxDistance={40}
+      minDistance={16}
+      maxDistance={45}
       maxPolarAngle={Math.PI / 3}
       minPolarAngle={Math.PI / 6}
       autoRotate={false}
@@ -734,16 +1039,14 @@ function CameraControls({ controlsRef }: { controlsRef: React.RefObject<any> }) 
   );
 }
 
-// Reset camera to default position + mobile FOV adjustment
 function CameraResetter({ controlsRef }: { controlsRef: React.RefObject<any> }) {
   const { camera } = useThree();
-
-  // On mobile, widen FOV slightly for more zoom-out
   const initialized = useRef(false);
+
   if (!initialized.current && typeof window !== 'undefined') {
     initialized.current = true;
     if (window.innerWidth < 640 && (camera as THREE.PerspectiveCamera).fov) {
-      (camera as THREE.PerspectiveCamera).fov = 44;
+      (camera as THREE.PerspectiveCamera).fov = 42;
       (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
     }
   }
@@ -763,6 +1066,7 @@ function CameraResetter({ controlsRef }: { controlsRef: React.RefObject<any> }) 
   return null;
 }
 
+// ═══ MAIN COMPONENT ═══
 export type AgentStatus = 'idle' | 'working' | 'discussing' | 'roaming';
 
 export interface AgentLiveData {
@@ -780,12 +1084,9 @@ export default function HQRoom3D({ liveAgents }: { liveAgents?: AgentLiveData[] 
     }
   }, []);
 
-  // Merge live data into agent configs
   const mergedConfigs = agentConfigs.map(config => {
     const live = liveAgents?.find(a => a.id === config.id);
-    if (live) {
-      return { ...config, status: live.status, thought: live.thought };
-    }
+    if (live) return { ...config, status: live.status, thought: live.thought };
     return config;
   });
 
@@ -799,34 +1100,77 @@ export default function HQRoom3D({ liveAgents }: { liveAgents?: AgentLiveData[] 
         style={{ background: 'transparent' }}
         orthographic={false}
       >
-        {/* Lighting */}
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[5, 12, 5]} intensity={1} color="#ffffff" />
-        <directionalLight position={[-5, 8, -5]} intensity={0.4} color="#ffffff" />
+        {/* ── Lighting ── */}
+        <ambientLight intensity={0.5} />
+        <directionalLight position={[8, 14, 6]} intensity={0.9} color="#ffffff" />
+        <directionalLight position={[-6, 10, -4]} intensity={0.3} color="#ffffff" />
 
-        {/* Colored ambient */}
-        <pointLight position={[-5, 3, 0]} intensity={0.3} color="#00d4ff" distance={12} />
-        <pointLight position={[5.5, 3, 0]} intensity={0.3} color="#00ff41" distance={12} />
+        {/* Colored ambient fills */}
+        <pointLight position={[-7, 4, 0]} intensity={0.25} color="#00d4ff" distance={14} />
+        <pointLight position={[7, 4, 0]} intensity={0.25} color="#00ff41" distance={14} />
 
-        {/* Hemisphere */}
-        <hemisphereLight args={['#1a2a1a', '#0a0a0a', 0.5]} />
-
-        {/* Fog */}
-        <fog attach="fog" args={['#0a0a0a', 28, 50]} />
+        <hemisphereLight args={['#1a2a1a', '#0a0a0a', 0.4]} />
+        <fog attach="fog" args={['#0a0a0a', 32, 55]} />
 
         <Suspense fallback={null}>
-          {/* Room structure */}
+          {/* ── Room structure ── */}
           <RoomFloor />
           <RoomWalls />
+          <GlassPartition />
 
-          {/* Room labels */}
-          <RoomLabel text="// office_space" position={[-5, 2.6, -6.5]} />
-          <RoomLabel text="// meeting_room" position={[5.5, 2.6, -6.5]} />
+          {/* ── Ceiling lights ── */}
+          <CeilingLight position={[-6.5, WALL_HEIGHT - 0.05, -5]} length={4} axis="x" />
+          <CeilingLight position={[-6.5, WALL_HEIGHT - 0.05,  0]} length={4} axis="x" />
+          <CeilingLight position={[-6.5, WALL_HEIGHT - 0.05,  5]} length={4} axis="x" />
+          <CeilingLight position={[7, WALL_HEIGHT - 0.05, 0]} length={4} axis="x" />
 
-          {/* Meeting table */}
-          <MeetingTable position={MEETING_TABLE_POS} />
+          {/* ── Room labels ── */}
+          <RoomLabel text="// workspace" position={[-6.5, WALL_HEIGHT + 0.1, -FLOOR_SIZE.d / 2 + 0.3]} />
+          <RoomLabel text="// conference" position={[7, WALL_HEIGHT + 0.1, -FLOOR_SIZE.d / 2 + 0.3]} />
 
-          {/* Agents */}
+          {/* ── Desk islands ── */}
+          <DeskIsland
+            position={ISLAND_CENTERS[0]}
+            colorLeft={agentConfigs[0].color}
+            colorRight={agentConfigs[1].color}
+          />
+          <DeskIsland
+            position={ISLAND_CENTERS[1]}
+            colorLeft={agentConfigs[2].color}
+            colorRight={agentConfigs[3].color}
+          />
+          <DeskIsland
+            position={ISLAND_CENTERS[2]}
+            colorLeft={agentConfigs[4].color}
+            colorRight={agentConfigs[5].color}
+          />
+
+          {/* ── Conference table ── */}
+          <ConferenceTable position={MEETING_TABLE_POS} />
+
+          {/* ── Decorations ── */}
+          {/* Plants */}
+          <Plant position={[-11.5, 0, -7.5]} size={1.2} />
+          <Plant position={[-11.5, 0,  7.5]} size={1.0} />
+          <Plant position={[11.5, 0, -7.5]} size={1.1} />
+          <Plant position={[11.5, 0,  7.5]} size={0.9} />
+          <Plant position={[-2, 0, -7.5]} size={0.8} />
+          <Plant position={[-2, 0,  7.5]} size={0.8} />
+
+          {/* Whiteboard on workspace back wall */}
+          <Whiteboard position={[-6.5, 1.8, -FLOOR_SIZE.d / 2 + 0.1]} />
+
+          {/* Bookshelf on left wall */}
+          <Bookshelf position={[-FLOOR_SIZE.w / 2 + 0.2, 0, -2]} rotation={[0, 90, 0]} />
+          <Bookshelf position={[-FLOOR_SIZE.w / 2 + 0.2, 0,  2]} rotation={[0, 90, 0]} />
+
+          {/* Coffee station */}
+          <CoffeeStation position={[-2, 0, 7]} />
+
+          {/* Conference room whiteboard on right wall */}
+          <Whiteboard position={[FLOOR_SIZE.w / 2 - 0.1, 1.8, 0]} rotation={[0, -90, 0]} />
+
+          {/* ── Agents ── */}
           {mergedConfigs.map((config, index) => (
             <AgentStation
               key={config.id}
@@ -840,7 +1184,7 @@ export default function HQRoom3D({ liveAgents }: { liveAgents?: AgentLiveData[] 
         <CameraResetter controlsRef={controlsRef} />
       </Canvas>
 
-      {/* Reset camera button — bottom right overlay */}
+      {/* Reset camera button */}
       <button
         onClick={handleResetCamera}
         className="absolute bottom-3 right-3 cursor-pointer font-mono"
