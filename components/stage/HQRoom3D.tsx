@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useRef, useCallback, Component, type ReactNode } from 'react';
+import { Suspense, useState, useRef, useEffect, useCallback, Component, type ReactNode } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, Grid, Html } from '@react-three/drei';
 import * as THREE from 'three';
@@ -1548,101 +1548,162 @@ function QuestBubble({ position, name, color }: { position: [number, number, num
   );
 }
 
-// ═══ HABBO BUBBLE ═══
-function HabboBubble({
-  name, color, thought, position,
-}: {
-  name: string; color: string; thought: string; position: [number, number, number];
-}) {
-  // Light tint of agent color for background
-  const tintBg = `${color}0D`; // 5% opacity hex
+// ═══ HABBO CHAT STACK ═══
+// Agent name → color lookup
+const SPEAKER_COLORS: Record<string, string> = {
+  'CEO': '#f59e0b',
+  'Kira': '#8b5cf6',
+  'Madara': '#22c55e',
+  'Stark': '#ec4899',
+  'L': '#3b82f6',
+  'Usopp': '#ef4444',
+};
+
+interface ChatMessage {
+  id: number;
+  speaker: string;
+  text: string;
+  color: string;
+  createdAt: number;
+}
+
+function HabboChatStack({ conversationLog, isDiscussing }: { conversationLog?: ConversationTurn[]; isDiscussing: boolean }) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const lastProcessedTurn = useRef(-1);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Add new messages as conversation_log grows (real-time via Supabase)
+  useEffect(() => {
+    if (!conversationLog || conversationLog.length === 0) return;
+
+    const newTurns = conversationLog.filter(t => t.turn > lastProcessedTurn.current);
+    if (newTurns.length === 0) return;
+
+    const newMessages: ChatMessage[] = newTurns.map(t => {
+      lastProcessedTurn.current = t.turn;
+      return {
+        id: t.turn,
+        speaker: t.speaker,
+        text: t.dialogue || t.message || '',
+        color: SPEAKER_COLORS[t.speaker] || '#00ff41',
+        createdAt: Date.now(),
+      };
+    });
+
+    setMessages(prev => [...prev, ...newMessages]);
+  }, [conversationLog]);
+
+  // Scroll up animation: every 1.5s, remove messages older than 12s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setMessages(prev => prev.filter(m => now - m.createdAt < 12000));
+    }, 1500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Reset when discussion ends
+  useEffect(() => {
+    if (!isDiscussing) {
+      setMessages([]);
+      lastProcessedTurn.current = -1;
+    }
+  }, [isDiscussing]);
+
+  if (messages.length === 0) return null;
 
   return (
-    <Html position={[position[0], position[1] + 2.3, position[2]]} center style={{ pointerEvents: 'none' }}>
-      <div className="select-none" style={{ animation: 'habboAppear 0.3s ease-out forwards' }}>
-        <div
-          style={{
-            background: `linear-gradient(135deg, #fffef5, ${tintBg})`,
-            border: `2px solid ${color}`,
-            borderRadius: '14px',
-            padding: '6px 10px',
-            maxWidth: '170px',
-            minWidth: '80px',
-            boxShadow: `2px 3px 0px rgba(0, 0, 0, 0.15)`,
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '6px',
-          }}
-        >
-          {/* Avatar circle */}
-          <div
-            style={{
-              width: '18px',
-              height: '18px',
-              minWidth: '18px',
-              borderRadius: '50%',
-              background: color,
-              boxShadow: `0 0 4px ${color}`,
-              marginTop: '1px',
-            }}
-          />
-          {/* Text content */}
-          <div style={{ flex: 1, minWidth: 0 }}>
+    <Html position={[7, 4.5, 0]} center style={{ pointerEvents: 'none' }}>
+      <div
+        ref={scrollRef}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '3px',
+          width: '380px',
+          maxHeight: '160px',
+          overflow: 'hidden',
+        }}
+      >
+        {messages.map((msg, idx) => {
+          const age = (Date.now() - msg.createdAt) / 1000;
+          // Scroll up: older messages move higher
+          const translateY = -age * 3;
+          // Fade out in last 3 seconds of life
+          const opacity = age > 9 ? Math.max(0, 1 - (age - 9) / 3) : 1;
+
+          return (
             <div
-              className="font-mono"
+              key={`${msg.id}-${idx}`}
               style={{
-                fontSize: '10px',
-                fontWeight: 800,
-                color,
-                lineHeight: 1.2,
-                marginBottom: '1px',
+                transform: `translateY(${translateY}px)`,
+                opacity,
+                transition: 'transform 1.5s linear, opacity 1.5s linear',
               }}
             >
-              {name}:
+              {/* Habbo-style wide bubble */}
+              <div
+                style={{
+                  background: '#fffef5',
+                  border: `1.5px solid ${msg.color}`,
+                  borderRadius: '10px',
+                  padding: '3px 8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '1px 2px 0px rgba(0, 0, 0, 0.12)',
+                  animation: idx === messages.length - 1 ? 'habboSlideIn 0.3s ease-out' : undefined,
+                }}
+              >
+                {/* Avatar dot */}
+                <div
+                  style={{
+                    width: '14px',
+                    height: '14px',
+                    minWidth: '14px',
+                    borderRadius: '50%',
+                    background: msg.color,
+                    boxShadow: `0 0 3px ${msg.color}`,
+                  }}
+                />
+                {/* Name + Text on same line */}
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                  <span
+                    className="font-mono"
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 800,
+                      color: msg.color,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {msg.speaker}:
+                  </span>
+                  <span
+                    className="font-sans"
+                    style={{
+                      fontSize: '10px',
+                      lineHeight: 1.3,
+                      color: '#1a1a1a',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {msg.text}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div
-              className="font-sans"
-              style={{
-                fontSize: '10px',
-                lineHeight: 1.3,
-                color: '#333',
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-                wordBreak: 'break-word',
-              }}
-            >
-              {thought}
-            </div>
-          </div>
-        </div>
-        {/* Speech pointer triangle */}
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <div style={{
-            width: 0,
-            height: 0,
-            borderLeft: '6px solid transparent',
-            borderRight: '6px solid transparent',
-            borderTop: `8px solid ${color}`,
-            position: 'relative',
-            top: '-1px',
-          }} />
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '-9px' }}>
-          <div style={{
-            width: 0,
-            height: 0,
-            borderLeft: '5px solid transparent',
-            borderRight: '5px solid transparent',
-            borderTop: '7px solid #fffef5',
-          }} />
-        </div>
+          );
+        })}
       </div>
       <style>{`
-        @keyframes habboAppear {
-          0% { opacity: 0; transform: scale(0.7) translateY(4px); }
-          100% { opacity: 1; transform: scale(1) translateY(0); }
+        @keyframes habboSlideIn {
+          0% { opacity: 0; transform: translateY(8px) scale(0.95); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
         }
       `}</style>
     </Html>
@@ -1655,15 +1716,10 @@ const allDeskPositions = agentConfigs.map(c => c.position);
 function AgentStation({ config, configIndex }: { config: typeof agentConfigs[0]; configIndex: number }) {
   const internalStateCode = SHARED_INTERNAL_STATES[configIndex];
   const isQuestReceived = internalStateCode === INTERNAL_STATE_CODES['quest-received'];
-  const isMeeting = internalStateCode === INTERNAL_STATE_CODES['meeting'];
-  const isWalkingToMeeting = internalStateCode === INTERNAL_STATE_CODES['walking-to-meeting'];
 
   const showSleepBubble = config.status === 'idle';
   const showWorkBubble = config.status === 'working';
   const showQuestBubble = config.status === 'discussing' && isQuestReceived;
-  const showHabboBubble = config.status === 'discussing' && isMeeting;
-  // Show compact speech bubble while walking to meeting
-  const showWalkingBubble = config.status === 'discussing' && isWalkingToMeeting;
 
   return (
     <>
@@ -1717,27 +1773,6 @@ function AgentStation({ config, configIndex }: { config: typeof agentConfigs[0];
       {showQuestBubble && (
         <QuestBubble position={config.position} name={config.name} color={config.color} />
       )}
-
-      {/* Walking to meeting → small name tag */}
-      {showWalkingBubble && (
-        <SpeechBubble
-          name={config.name}
-          color={config.color}
-          thought={config.thought}
-          status={config.status}
-          position={meetingSeatPositions[configIndex % meetingSeatPositions.length]}
-        />
-      )}
-
-      {/* At meeting → Habbo-style bubble */}
-      {showHabboBubble && (
-        <HabboBubble
-          name={config.name}
-          color={config.color}
-          thought={config.thought}
-          position={meetingSeatPositions[configIndex % meetingSeatPositions.length]}
-        />
-      )}
     </>
   );
 }
@@ -1789,13 +1824,21 @@ function CameraResetter({ controlsRef }: { controlsRef: React.RefObject<any> }) 
 // ═══ MAIN COMPONENT ═══
 export type AgentStatus = 'idle' | 'working' | 'discussing' | 'roaming';
 
+export interface ConversationTurn {
+  speaker: string;
+  dialogue?: string;
+  message?: string;
+  turn: number;
+  timestamp?: string;
+}
+
 export interface AgentLiveData {
   id: string;
   status: AgentStatus;
   thought: string;
 }
 
-export default function HQRoom3D({ liveAgents }: { liveAgents?: AgentLiveData[] }) {
+export default function HQRoom3D({ liveAgents, conversationLog }: { liveAgents?: AgentLiveData[]; conversationLog?: ConversationTurn[] }) {
   const controlsRef = useRef<any>(null);
 
   const handleResetCamera = useCallback(() => {
@@ -1991,6 +2034,12 @@ export default function HQRoom3D({ liveAgents }: { liveAgents?: AgentLiveData[] 
               configIndex={index}
             />
           ))}
+
+          {/* ── Habbo Chat Stack (above meeting table) ── */}
+          <HabboChatStack
+            conversationLog={conversationLog}
+            isDiscussing={mergedConfigs.some(c => c.status === 'discussing')}
+          />
         </Suspense>
 
         <CameraControls controlsRef={controlsRef} />

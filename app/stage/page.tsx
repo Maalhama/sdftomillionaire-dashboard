@@ -395,7 +395,7 @@ export default function StagePage() {
           </div>
 
           <div className="terminal-body !max-h-none p-0">
-            <HQRoom3D liveAgents={liveAgents} />
+            <HQRoom3D liveAgents={liveAgents} conversationLog={activeRoundtable?.conversation_log} />
 
             {/* Room Footer - Status bar */}
             <div className="flex items-center justify-between px-4 py-2 bg-hacker-terminal border-t border-hacker-border font-mono text-[10px] text-hacker-muted">
