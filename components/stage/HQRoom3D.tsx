@@ -1013,26 +1013,263 @@ function TrashBin({ position }: { position: [number, number, number] }) {
   );
 }
 
-// Ceiling strip light
-function CeilingLight({ position, length, axis = 'x' }: {
+// Neon wall sign — glowing text-like strip
+function NeonSign({ position, rotation = [0, 0, 0], width = 1.2, color = '#00ff41' }: {
   position: [number, number, number];
-  length: number;
-  axis?: 'x' | 'z';
+  rotation?: [number, number, number];
+  width?: number;
+  color?: string;
+}) {
+  return (
+    <group position={position} rotation={rotation.map(r => r * Math.PI / 180) as unknown as THREE.Euler}>
+      {/* Backing plate */}
+      <mesh>
+        <boxGeometry args={[width, 0.3, 0.02]} />
+        <meshStandardMaterial color="#0a0a0a" />
+      </mesh>
+      {/* Neon tube */}
+      <mesh position={[0, 0, 0.015]}>
+        <boxGeometry args={[width * 0.85, 0.06, 0.01]} />
+        <meshBasicMaterial color={color} transparent opacity={0.9} />
+      </mesh>
+      {/* Second line */}
+      <mesh position={[width * 0.1, -0.1, 0.015]}>
+        <boxGeometry args={[width * 0.5, 0.04, 0.01]} />
+        <meshBasicMaterial color={color} transparent opacity={0.6} />
+      </mesh>
+      <pointLight position={[0, 0, 0.15]} color={color} intensity={0.3} distance={3} />
+    </group>
+  );
+}
+
+// Kanban board — task board with colored cards
+function KanbanBoard({ position, rotation = [0, 0, 0] }: {
+  position: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  const cardColors = ['#00ff41', '#f59e0b', '#8b5cf6', '#3b82f6', '#ec4899', '#ef4444', '#22c55e', '#00d4ff'];
+  return (
+    <group position={position} rotation={rotation.map(r => r * Math.PI / 180) as unknown as THREE.Euler}>
+      {/* Board background */}
+      <mesh>
+        <boxGeometry args={[2.2, 1.4, 0.03]} />
+        <meshStandardMaterial color="#111" />
+      </mesh>
+      {/* Column dividers */}
+      {[-0.37, 0.37].map((x, i) => (
+        <mesh key={i} position={[x, 0, 0.02]}>
+          <boxGeometry args={[0.005, 1.2, 0.005]} />
+          <meshBasicMaterial color="#00ff41" transparent opacity={0.3} />
+        </mesh>
+      ))}
+      {/* Column headers */}
+      {[[-0.73, 'TODO'], [0, 'IN PROG'], [0.73, 'DONE']].map(([x, _label], i) => (
+        <mesh key={`h-${i}`} position={[x as number, 0.55, 0.02]}>
+          <boxGeometry args={[0.65, 0.08, 0.005]} />
+          <meshBasicMaterial color="#00ff41" transparent opacity={0.2} />
+        </mesh>
+      ))}
+      {/* Sticky note cards */}
+      {cardColors.map((c, i) => {
+        const col = i < 3 ? -0.73 : i < 5 ? 0 : 0.73;
+        const row = i < 3 ? i : i < 5 ? i - 3 : i - 5;
+        return (
+          <mesh key={i} position={[col + (i % 2) * 0.08, 0.3 - row * 0.28, 0.02]}>
+            <boxGeometry args={[0.28, 0.2, 0.005]} />
+            <meshStandardMaterial color="#0a0a0a" emissive={c} emissiveIntensity={0.12} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+// Small coffee table (between sofas)
+function CoffeeTableSmall({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      {/* Top */}
+      <mesh position={[0, 0.35, 0]}>
+        <boxGeometry args={[0.8, 0.03, 0.5]} />
+        <meshStandardMaterial color="#111" roughness={0.3} metalness={0.4} />
+      </mesh>
+      {/* Legs */}
+      {[[-0.3, 0.17, -0.18], [0.3, 0.17, -0.18], [-0.3, 0.17, 0.18], [0.3, 0.17, 0.18]].map((p, i) => (
+        <mesh key={i} position={p as [number, number, number]}>
+          <cylinderGeometry args={[0.02, 0.02, 0.34, 6]} />
+          <meshStandardMaterial color="#1a1a1a" metalness={0.5} />
+        </mesh>
+      ))}
+      {/* Magazine on top */}
+      <mesh position={[0.1, 0.37, 0.05]} rotation={[0, 0.3, 0]}>
+        <boxGeometry args={[0.2, 0.008, 0.15]} />
+        <meshStandardMaterial color="#0a1a0a" emissive="#00ff41" emissiveIntensity={0.04} />
+      </mesh>
+      {/* Cup on top */}
+      <mesh position={[-0.2, 0.4, -0.05]}>
+        <cylinderGeometry args={[0.035, 0.03, 0.08, 8]} />
+        <meshStandardMaterial color="#1a1a1a" emissive="#f59e0b" emissiveIntensity={0.03} />
+      </mesh>
+    </group>
+  );
+}
+
+// Floor cable channel — colored strip on ground
+function CableTrack({ from, to, color = '#00ff41' }: {
+  from: [number, number, number];
+  to: [number, number, number];
+  color?: string;
+}) {
+  const dx = to[0] - from[0];
+  const dz = to[2] - from[2];
+  const length = Math.sqrt(dx * dx + dz * dz);
+  const angle = Math.atan2(dx, dz);
+  const cx = (from[0] + to[0]) / 2;
+  const cz = (from[2] + to[2]) / 2;
+
+  return (
+    <mesh position={[cx, 0.008, cz]} rotation={[0, angle, 0]}>
+      <boxGeometry args={[0.06, 0.005, length]} />
+      <meshBasicMaterial color={color} transparent opacity={0.08} />
+    </mesh>
+  );
+}
+
+// Wall-mounted floating shelf with small items
+function WallShelf({ position, rotation = [0, 0, 0] }: {
+  position: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  return (
+    <group position={position} rotation={rotation.map(r => r * Math.PI / 180) as unknown as THREE.Euler}>
+      {/* Shelf plank */}
+      <mesh>
+        <boxGeometry args={[0.8, 0.025, 0.2]} />
+        <meshStandardMaterial color="#111" />
+      </mesh>
+      {/* Bracket */}
+      {[-0.3, 0.3].map((x, i) => (
+        <mesh key={i} position={[x, -0.08, -0.08]}>
+          <boxGeometry args={[0.02, 0.15, 0.02]} />
+          <meshStandardMaterial color="#1a1a1a" metalness={0.5} />
+        </mesh>
+      ))}
+      {/* Small trophy/figurine */}
+      <mesh position={[-0.15, 0.07, 0]}>
+        <cylinderGeometry args={[0.03, 0.04, 0.12, 8]} />
+        <meshStandardMaterial color="#1a1a1a" emissive="#f59e0b" emissiveIntensity={0.08} />
+      </mesh>
+      {/* Small cube */}
+      <mesh position={[0.15, 0.04, 0]}>
+        <boxGeometry args={[0.06, 0.06, 0.06]} />
+        <meshStandardMaterial color="#0a0a0a" emissive="#8b5cf6" emissiveIntensity={0.06} />
+      </mesh>
+      {/* Photo frame */}
+      <mesh position={[0, 0.06, -0.06]} rotation={[-0.2, 0, 0]}>
+        <boxGeometry args={[0.1, 0.08, 0.005]} />
+        <meshStandardMaterial color="#1a1a1a" emissive="#00ff41" emissiveIntensity={0.03} />
+      </mesh>
+    </group>
+  );
+}
+
+// Fire extinguisher
+function FireExtinguisher({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      {/* Body */}
+      <mesh position={[0, 0.3, 0]}>
+        <cylinderGeometry args={[0.06, 0.06, 0.4, 10]} />
+        <meshStandardMaterial color="#1a0505" emissive="#ff2222" emissiveIntensity={0.04} />
+      </mesh>
+      {/* Handle */}
+      <mesh position={[0, 0.52, 0]}>
+        <boxGeometry args={[0.04, 0.04, 0.04]} />
+        <meshStandardMaterial color="#1a1a1a" metalness={0.5} />
+      </mesh>
+      {/* Nozzle */}
+      <mesh position={[0.04, 0.5, 0]} rotation={[0, 0, -0.4]}>
+        <cylinderGeometry args={[0.008, 0.008, 0.08, 6]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+    </group>
+  );
+}
+
+// Sticky notes cluster on wall
+function StickyNotes({ position, rotation = [0, 0, 0] }: {
+  position: [number, number, number];
+  rotation?: [number, number, number];
+}) {
+  const notes = [
+    { x: 0, y: 0, color: '#1a2a0a', emissive: '#00ff41' },
+    { x: 0.14, y: 0.02, color: '#2a1a0a', emissive: '#f59e0b' },
+    { x: -0.12, y: 0.13, color: '#0a1a2a', emissive: '#3b82f6' },
+    { x: 0.06, y: 0.15, color: '#2a0a1a', emissive: '#ec4899' },
+    { x: -0.05, y: -0.12, color: '#1a0a2a', emissive: '#8b5cf6' },
+  ];
+  return (
+    <group position={position} rotation={rotation.map(r => r * Math.PI / 180) as unknown as THREE.Euler}>
+      {notes.map((n, i) => (
+        <mesh key={i} position={[n.x, n.y, 0.005 * i]}>
+          <boxGeometry args={[0.12, 0.12, 0.003]} />
+          <meshStandardMaterial color={n.color} emissive={n.emissive} emissiveIntensity={0.08} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+// LED wall strip — thin glowing line along an axis
+function LEDStrip({ from, to, color = '#00ff41', intensity = 0.15 }: {
+  from: [number, number, number];
+  to: [number, number, number];
+  color?: string;
+  intensity?: number;
+}) {
+  const dx = to[0] - from[0];
+  const dz = to[2] - from[2];
+  const length = Math.sqrt(dx * dx + dz * dz) || 0.1;
+  const angle = Math.atan2(dx, dz);
+  const cx = (from[0] + to[0]) / 2;
+  const cy = (from[1] + to[1]) / 2;
+  const cz = (from[2] + to[2]) / 2;
+
+  return (
+    <group position={[cx, cy, cz]}>
+      <mesh rotation={[0, angle, 0]}>
+        <boxGeometry args={[0.02, 0.02, length]} />
+        <meshBasicMaterial color={color} transparent opacity={0.7} />
+      </mesh>
+      <pointLight color={color} intensity={intensity} distance={4} />
+    </group>
+  );
+}
+
+// Desk lamp (small accent light)
+function DeskLamp({ position, color = '#00ff41' }: {
+  position: [number, number, number];
+  color?: string;
 }) {
   return (
     <group position={position}>
-      {/* Housing */}
-      <mesh rotation={axis === 'z' ? [0, Math.PI / 2, 0] : [0, 0, 0]}>
-        <boxGeometry args={[length, 0.04, 0.15]} />
-        <meshStandardMaterial color="#111" />
+      {/* Base */}
+      <mesh position={[0, 0, 0]}>
+        <cylinderGeometry args={[0.06, 0.07, 0.02, 10]} />
+        <meshStandardMaterial color="#1a1a1a" metalness={0.5} />
       </mesh>
-      {/* Light strip */}
-      <mesh position={[0, -0.03, 0]} rotation={axis === 'z' ? [0, Math.PI / 2, 0] : [0, 0, 0]}>
-        <boxGeometry args={[length - 0.1, 0.01, 0.08]} />
-        <meshBasicMaterial color="#ccddcc" transparent opacity={0.6} />
+      {/* Arm */}
+      <mesh position={[0, 0.15, 0]}>
+        <cylinderGeometry args={[0.008, 0.008, 0.28, 6]} />
+        <meshStandardMaterial color="#222" metalness={0.6} />
       </mesh>
-      {/* Actual light */}
-      <pointLight position={[0, -0.1, 0]} color="#eeffee" intensity={1.2} distance={10} />
+      {/* Shade */}
+      <mesh position={[0.03, 0.28, 0]} rotation={[0, 0, -0.3]}>
+        <coneGeometry args={[0.06, 0.08, 8, 1, true]} />
+        <meshStandardMaterial color="#1a1a1a" side={THREE.DoubleSide} />
+      </mesh>
+      {/* Light */}
+      <pointLight position={[0.03, 0.25, 0]} color={color} intensity={0.15} distance={1.5} />
     </group>
   );
 }
@@ -1512,6 +1749,51 @@ export default function HQRoom3D({ liveAgents }: { liveAgents?: AgentLiveData[] 
           <TrashBin position={[-3.5, 0, -5]} />
           <TrashBin position={[-3.5, 0,  5]} />
           <TrashBin position={[4, 0, 2.5]} />
+          <TrashBin position={[-9.5, 0, -2.5]} />
+
+          {/* ── NEW DECO — vivant ── */}
+
+          {/* Neon signs on walls */}
+          <NeonSign position={[-6.5, 2.5, FLOOR_SIZE.d / 2 - 0.1]} rotation={[0, 180, 0]} width={2} color="#00ff41" />
+          <NeonSign position={[7, 2.5, FLOOR_SIZE.d / 2 - 0.1]} rotation={[0, 180, 0]} width={1.5} color="#00d4ff" />
+          <NeonSign position={[-FLOOR_SIZE.w / 2 + 0.1, 2.3, -2.5]} rotation={[0, 90, 0]} width={1} color="#8b5cf6" />
+
+          {/* Kanban board — workspace back wall */}
+          <KanbanBoard position={[-9.5, 1.7, -FLOOR_SIZE.d / 2 + 0.1]} />
+
+          {/* Coffee tables between sofas in lounge */}
+          <CoffeeTableSmall position={[10.5, 0, 4.5]} />
+          <CoffeeTableSmall position={[10.5, 0, -4.5]} />
+
+          {/* Floor cable tracks — subtle green lines connecting desks */}
+          <CableTrack from={[-8.5, 0, -5]} to={[-8.5, 0, 0]} />
+          <CableTrack from={[-4.5, 0, 0]} to={[-4.5, 0, 5]} />
+          <CableTrack from={[-6.5, 0, -5]} to={[-2, 0, -5]} />
+          <CableTrack from={[-6.5, 0, 5]} to={[-2, 0, 7]} color="#f59e0b" />
+
+          {/* Floating wall shelves */}
+          <WallShelf position={[-FLOOR_SIZE.w / 2 + 0.25, 1.5, -2.5]} rotation={[0, 90, 0]} />
+          <WallShelf position={[-FLOOR_SIZE.w / 2 + 0.25, 1.5,  2.5]} rotation={[0, 90, 0]} />
+          <WallShelf position={[FLOOR_SIZE.w / 2 - 0.25, 1.5, -2]} rotation={[0, -90, 0]} />
+
+          {/* Fire extinguishers — safety */}
+          <FireExtinguisher position={[0, 0, -8]} />
+          <FireExtinguisher position={[FLOOR_SIZE.w / 2 - 0.5, 0, 7.5]} />
+
+          {/* Sticky notes clusters on walls */}
+          <StickyNotes position={[-4, 1.5, -FLOOR_SIZE.d / 2 + 0.08]} />
+          <StickyNotes position={[-8, 1.5, -FLOOR_SIZE.d / 2 + 0.08]} />
+          <StickyNotes position={[5, 1.5, -FLOOR_SIZE.d / 2 + 0.08]} />
+          <StickyNotes position={[10, 1.5, -FLOOR_SIZE.d / 2 + 0.08]} />
+
+          {/* LED strips along walls — ambient glow */}
+          <LEDStrip from={[-FLOOR_SIZE.w / 2, 0.05, -FLOOR_SIZE.d / 2]} to={[-FLOOR_SIZE.w / 2, 0.05, FLOOR_SIZE.d / 2]} color="#00ff41" intensity={0.08} />
+          <LEDStrip from={[FLOOR_SIZE.w / 2, 0.05, -FLOOR_SIZE.d / 2]} to={[FLOOR_SIZE.w / 2, 0.05, FLOOR_SIZE.d / 2]} color="#00d4ff" intensity={0.08} />
+          <LEDStrip from={[-FLOOR_SIZE.w / 2, WALL_HEIGHT - 0.05, -FLOOR_SIZE.d / 2]} to={[FLOOR_SIZE.w / 2, WALL_HEIGHT - 0.05, -FLOOR_SIZE.d / 2]} color="#00ff41" intensity={0.06} />
+
+          {/* Desk lamps on conference table */}
+          <DeskLamp position={[5.8, 0.72, -0.4]} color="#00ff41" />
+          <DeskLamp position={[8.2, 0.72, 0.4]} color="#00d4ff" />
 
           {/* ── Agents ── */}
           {mergedConfigs.map((config, index) => (
