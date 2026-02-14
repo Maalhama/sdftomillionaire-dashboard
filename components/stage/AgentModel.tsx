@@ -241,17 +241,31 @@ export default function AgentModel({
       sharedPositions[agentIndex * 2 + 1] = position[2];
     }
     if (status === 'discussing' && meetingPositions.length > 0) {
+      // On page load with discussing already active → teleport to meeting seat
       const seat = meetingPositions[agentIndex % meetingPositions.length];
       b.meetingSeatX = seat[0];
       b.meetingSeatZ = seat[2];
-      b.internalState = 'quest-received';
+      b.px = seat[0];
+      b.pz = seat[2];
+      b.internalState = 'meeting';
       b.stateTimer = 0;
+      // Face the table center (7, 0, 0)
+      b.currentRotY = Math.atan2(7 - seat[0], 0 - seat[2]);
+      b.targetRotY = b.currentRotY;
+      if (sharedPositions) {
+        sharedPositions[agentIndex * 2] = seat[0];
+        sharedPositions[agentIndex * 2 + 1] = seat[2];
+      }
     } else if (status === 'roaming' && roamWaypoints.length > 0) {
       b.shuffledWaypoints = shuffleArray(roamWaypoints);
       b.waypointIndex = 0;
       pickNextWaypoint();
     } else if (status === 'working') {
       b.internalState = 'working';
+    }
+    // Write initial internal state
+    if (sharedInternalStates) {
+      sharedInternalStates[agentIndex] = INTERNAL_STATE_CODES[b.internalState];
     }
   }
 
@@ -620,10 +634,13 @@ export default function AgentModel({
     }
   });
 
+  // Use current behavioral position for initial render (prevents flash on refresh)
+  const initialPos: [number, number, number] = [b.px, 0, b.pz];
+
   return (
     <group
       ref={groupRef}
-      position={position}
+      position={initialPos}
       rotation={rotation.map(r => r * Math.PI / 180) as unknown as THREE.Euler}
       scale={[scale, scale, scale]}
     >
