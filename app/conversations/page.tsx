@@ -23,19 +23,6 @@ interface Conversation {
   finished_at?: string;
 }
 
-const agentColors: Record<string, string> = {
-  CEO: '#f59e0b',
-  Kira: '#8b5cf6',
-  KIRA: '#8b5cf6',
-  Madara: '#22c55e',
-  MADARA: '#22c55e',
-  Stark: '#ec4899',
-  STARK: '#ec4899',
-  L: '#3b82f6',
-  Usopp: '#ef4444',
-  USOPP: '#ef4444',
-};
-
 export default function ConversationsPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selected, setSelected] = useState<Conversation | null>(null);
@@ -75,10 +62,13 @@ export default function ConversationsPage() {
   }
 
   const getAgentInfo = (name: string) => {
-    const found = Object.values(AGENTS).find(a => 
+    // Try by agent ID first, then by display name
+    const byId = AGENTS[name as AgentId];
+    if (byId) return byId;
+    const found = Object.values(AGENTS).find(a =>
       a.name.toLowerCase() === name.toLowerCase()
     );
-    return found || { emoji: '🤖', avatar: '/agents/opus.png', color: '#888', name };
+    return found || { emoji: '🤖', avatar: '/agents/opus.png', color: '#888', name, role: '' };
   };
 
   const getStatusInfo = (status: string) => {
@@ -251,7 +241,7 @@ export default function ConversationsPage() {
                 <div className="max-h-[500px] overflow-y-auto p-4 space-y-4">
                   {selected.conversation_log?.map((msg, i) => {
                     const agent = getAgentInfo(msg.speaker);
-                    const color = agentColors[msg.speaker] || '#888';
+                    const color = agent.color;
                     
                     return (
                       <div 

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { ChevronUp, Copy, ExternalLink, ArrowLeft, Zap, Eye, FlaskConical, HardDrive, Terminal, CircuitBoard, TrendingUp, ArrowRight, Braces } from 'lucide-react';
 import Link from 'next/link';
-import { supabase, AGENTS } from '@/lib/supabase';
+import { supabase, AGENTS, AgentId } from '@/lib/supabase';
 
 interface RevenueEntry {
   id: string;
@@ -71,15 +71,7 @@ const successStories = [
   }
 ];
 
-const agentDisplayNames: Record<string, { name: string; avatar: string }> = {
-  opus: { name: 'CEO', avatar: '/agents/opus.png' },
-  brain: { name: 'KIRA', avatar: '/agents/brain.png' },
-  growth: { name: 'MADARA', avatar: '/agents/growth.png' },
-  creator: { name: 'STARK', avatar: '/agents/creator.jpg' },
-  'twitter-alt': { name: 'L', avatar: '/agents/twitter-alt.png' },
-  'company-observer': { name: 'USOPP', avatar: '/agents/company-observer.jpg' },
-  system: { name: 'SYSTEM', avatar: '/agents/opus.png' },
-};
+const SYSTEM_AGENT = { name: 'SYSTEM', avatar: '/agents/opus.png' };
 
 function AsciiProgressBar({ progress, width = 20 }: { progress: number; width?: number }) {
   const filled = Math.round((progress / 100) * width);
@@ -109,7 +101,7 @@ export default function RadarPage() {
   const [activity, setActivity] = useState<AgentEvent[]>([]);
   const [revenue, setRevenue] = useState<RevenueEntry[]>([]);
   const [revenueTotal, setRevenueTotal] = useState(0);
-  const [pipelineCounts, setPipelineCounts] = useState({ pending: 0, evaluating: 0, evaluated: 0, shipped: 3 });
+  const [pipelineCounts, setPipelineCounts] = useState({ pending: 0, evaluating: 0, evaluated: 0, shipped: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -127,7 +119,7 @@ export default function RadarPage() {
             pending: prompts.filter(p => p.status === 'pending').length,
             evaluating: prompts.filter(p => p.status === 'evaluating').length,
             evaluated: prompts.filter(p => p.status === 'evaluated').length,
-            shipped: 3,
+            shipped: prompts.filter(p => ['completed', 'published'].includes(p.status)).length,
           });
         }
         if (events) setActivity(events);
@@ -161,7 +153,7 @@ export default function RadarPage() {
                 pending: data.filter(p => p.status === 'pending').length,
                 evaluating: data.filter(p => p.status === 'evaluating').length,
                 evaluated: data.filter(p => p.status === 'evaluated').length,
-                shipped: 3,
+                shipped: data.filter(p => ['completed', 'published'].includes(p.status)).length,
               });
             }
           });
@@ -454,7 +446,8 @@ export default function RadarPage() {
               </p>
             ) : (
               activity.map((event) => {
-                const agent = agentDisplayNames[event.agent_id] || agentDisplayNames.system;
+                const agentData = AGENTS[event.agent_id as AgentId];
+                const agent = agentData ? { name: agentData.name, avatar: agentData.avatar } : SYSTEM_AGENT;
                 return (
                   <div key={event.id} className="flex items-start gap-3 font-mono text-sm">
                     <span className="text-hacker-muted text-xs whitespace-nowrap">{timeAgo(event.created_at)}</span>

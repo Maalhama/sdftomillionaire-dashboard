@@ -61,24 +61,6 @@ interface Roundtable {
   created_at: string;
 }
 
-const agentColors: Record<string, string> = {
-  opus: '#f59e0b',
-  brain: '#8b5cf6',
-  growth: '#22c55e',
-  creator: '#ec4899',
-  'twitter-alt': '#3b82f6',
-  'company-observer': '#ef4444',
-};
-
-const agentNameMap: Record<string, string> = {
-  opus: 'CEO',
-  brain: 'KIRA',
-  growth: 'MADARA',
-  creator: 'STARK',
-  'twitter-alt': 'L',
-  'company-observer': 'USOPP',
-};
-
 const statusMap: Record<string, { dot: string; label: string }> = {
   active: { dot: 'status-active', label: 'ACTIVE' },
   working: { dot: 'status-working', label: 'WORKING' },
@@ -183,8 +165,8 @@ export default function StagePage() {
     return () => clearInterval(blink);
   }, []);
 
-  const getAgentName = (agentId: string) => agentNameMap[agentId] || agentId.toUpperCase();
-  const getAgentColor = (agentId: string) => agentColors[agentId] || '#00ff41';
+  const getAgentName = (agentId: string) => AGENTS[agentId as AgentId]?.name || agentId.toUpperCase();
+  const getAgentColor = (agentId: string) => AGENTS[agentId as AgentId]?.color || '#00ff41';
   const getAgentEmoji = (agentId: string) => AGENTS[agentId as AgentId]?.emoji || '🤖';
   const getAgentAvatar = (agentId: string) => AGENTS[agentId as AgentId]?.avatar || '/agents/opus.png';
 
@@ -279,7 +261,7 @@ export default function StagePage() {
     
     return {
       id,
-      name: agentNameMap[id] || agent.name,
+      name: agent.name,
       emoji: agent.emoji,
       avatar: agent.avatar,
       status,
@@ -570,8 +552,8 @@ export default function StagePage() {
                 <div className="font-mono text-sm text-hacker-amber mb-1">💬 {activeRoundtable.topic}</div>
                 <div className="flex flex-wrap gap-2 text-xs">
                   {activeRoundtable.participants.map((p) => (
-                    <span key={p} className="badge badge-muted" style={{ color: agentColors[p] || '#00ff41' }}>
-                      {agentNameMap[p] || p}
+                    <span key={p} className="badge badge-muted" style={{ color: AGENTS[p as AgentId]?.color || '#00ff41' }}>
+                      {AGENTS[p as AgentId]?.name || p}
                     </span>
                   ))}
                   <span className="text-hacker-muted ml-2">
@@ -582,8 +564,8 @@ export default function StagePage() {
 
               <div className="space-y-3">
                 {activeRoundtable.conversation_log?.map((turn, idx) => {
-                  const speakerColor = agentColors[turn.speaker] || '#00ff41';
-                  const speakerName = agentNameMap[turn.speaker] || turn.speaker.toUpperCase();
+                  const speakerColor = AGENTS[turn.speaker as AgentId]?.color || '#00ff41';
+                  const speakerName = AGENTS[turn.speaker as AgentId]?.name || turn.speaker;
                   const message = turn.dialogue || turn.message || '';
                   
                   return (

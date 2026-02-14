@@ -52,24 +52,6 @@ interface AgentRelationship {
 
 // ═══ STATIC DATA ═══
 
-const agentColors: Record<string, string> = {
-  opus: '#f59e0b',
-  brain: '#8b5cf6',
-  growth: '#22c55e',
-  creator: '#ec4899',
-  'twitter-alt': '#3b82f6',
-  'company-observer': '#ef4444',
-};
-
-const agentAvatars: Record<string, string> = {
-  opus: '/agents/opus.png',
-  brain: '/agents/brain.png',
-  growth: '/agents/growth.png',
-  creator: '/agents/creator.jpg',
-  'twitter-alt': '/agents/twitter-alt.png',
-  'company-observer': '/agents/company-observer.jpg',
-};
-
 const agentModelPaths: Record<string, string> = {
   opus: '/models/minion.glb',
   brain: '/models/sage.glb',
@@ -229,7 +211,7 @@ export default function AgentsPage() {
   }
 
   const agent = AGENTS[selectedAgent];
-  const color = agentColors[selectedAgent] || '#00ff41';
+  const color = agent.color;
   const role = agentRoles[selectedAgent];
   const stats = allStats.find(s => s.agent_id === selectedAgent) || null;
   const lastEvent = recentEvents.find(e => e.agent_id === selectedAgent) || null;
@@ -241,7 +223,7 @@ export default function AgentsPage() {
     .map(r => {
       const otherId = r.agent_a === selectedAgent ? r.agent_b : r.agent_a;
       const otherAgent = AGENTS[otherId as AgentId];
-      return { ...r, otherId, otherName: otherAgent?.name || otherId, otherColor: agentColors[otherId] || '#888' };
+      return { ...r, otherId, otherName: otherAgent?.name || otherId, otherColor: otherAgent?.color || '#888' };
     })
     .sort((a, b) => b.affinity - a.affinity);
 
@@ -330,7 +312,7 @@ export default function AgentsPage() {
                 className="w-8 h-8 rounded-full overflow-hidden border-2 shrink-0"
                 style={{ borderColor: color, boxShadow: `0 0 8px ${color}33` }}
               >
-                <Image src={agentAvatars[selectedAgent]} alt={agent.name} width={32} height={32} className="w-full h-full object-cover" />
+                <Image src={agent.avatar} alt={agent.name} width={32} height={32} className="w-full h-full object-cover" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -387,7 +369,7 @@ export default function AgentsPage() {
                   className="w-8 h-8 rounded-full overflow-hidden border"
                   style={{ borderColor: color, boxShadow: `0 0 10px ${color}33` }}
                 >
-                  <Image src={agentAvatars[selectedAgent]} alt={agent.name} width={32} height={32} className="w-full h-full object-cover" />
+                  <Image src={agent.avatar} alt={agent.name} width={32} height={32} className="w-full h-full object-cover" />
                 </div>
                 <div>
                   <span className="text-sm font-bold block" style={{ color }}>{agent.name}</span>
@@ -446,7 +428,7 @@ export default function AgentsPage() {
           <div className="border-t border-hacker-border px-3 sm:px-4 py-2.5 sm:py-3 bg-hacker-terminal flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-5 overflow-x-auto">
               {Object.entries(AGENTS).map(([id, agentInfo]) => {
-                const ac = agentColors[id] || '#00ff41';
+                const ac = agentInfo.color;
                 const isSelected = selectedAgent === id;
                 const agentStats = allStats.find(s => s.agent_id === id);
                 return (
@@ -464,7 +446,7 @@ export default function AgentsPage() {
                         boxShadow: isSelected ? `0 0 12px ${ac}44` : 'none',
                       }}
                     >
-                      <Image src={agentAvatars[id]} alt={agentInfo.name} width={36} height={36} className="w-full h-full object-cover" />
+                      <Image src={agentInfo.avatar} alt={agentInfo.name} width={36} height={36} className="w-full h-full object-cover" />
                     </div>
                     {isSelected && (
                       <span className="text-[7px] sm:text-[8px] font-mono font-bold uppercase tracking-widest" style={{ color: ac }}>
@@ -517,7 +499,7 @@ export default function AgentsPage() {
                       className="w-12 h-12 rounded-full overflow-hidden border-2"
                       style={{ borderColor: color, boxShadow: `0 0 16px ${color}33` }}
                     >
-                      <Image src={agentAvatars[selectedAgent]} alt={agent.name} width={48} height={48} className="w-full h-full object-cover" />
+                      <Image src={agent.avatar} alt={agent.name} width={48} height={48} className="w-full h-full object-cover" />
                     </div>
                     <div>
                       <h2 className="text-lg font-bold" style={{ color }}>
@@ -693,7 +675,7 @@ export default function AgentsPage() {
                       style={{ borderColor: `${rel.otherColor}20` }}
                     >
                       <Image
-                        src={agentAvatars[rel.otherId] || '/agents/opus.png'}
+                        src={AGENTS[rel.otherId as AgentId]?.avatar || '/agents/opus.png'}
                         alt={rel.otherName}
                         width={28}
                         height={28}
