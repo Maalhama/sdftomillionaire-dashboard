@@ -1619,8 +1619,8 @@ function HabboChatController({ conversationLog, isDiscussing }: { conversationLo
       { ...next, offsetY: 0, zOrder, opacity: 1 },
     ]);
 
-    // Next message after 5s — enough for current one to rise and make room
-    timerRef.current = setTimeout(showNext, 5000);
+    // Next message after 7s — good reading time + space between bubbles
+    timerRef.current = setTimeout(showNext, 7000);
   }, []);
 
   // Queue new turns
@@ -1661,12 +1661,12 @@ function HabboChatController({ conversationLog, isDiscussing }: { conversationLo
           const age = (now - m.createdAt) / 1000;
           return {
             ...m,
-            offsetY: age * 6, // 6px/s upward
-            opacity: age > 8 ? Math.max(0, 1 - (age - 8) / 2) : 1,
+            offsetY: age * 4, // 4px/s upward — slow rise, long visible trail
+            opacity: age > 20 ? Math.max(0, 1 - (age - 20) / 5) : 1,
           };
         });
-        // Remove fully faded messages (>10s old)
-        return updated.filter(m => (now - m.createdAt) < 10000);
+        // Remove fully faded messages (>25s old)
+        return updated.filter(m => (now - m.createdAt) < 25000);
       });
     }, 60);
     return () => clearInterval(interval);
@@ -1713,7 +1713,7 @@ function HabboChatController({ conversationLog, isDiscussing }: { conversationLo
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                width: '480px',
+                width: '680px',
                 boxShadow: '0 2px 6px rgba(0, 0, 0, 0.5)',
                 borderLeft: `3px solid ${msg.color}`,
               }}

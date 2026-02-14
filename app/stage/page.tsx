@@ -194,7 +194,7 @@ export default function StagePage() {
     ) {
       const finishedAt = new Date(activeRoundtable.finished_at).getTime();
       const turnCount = activeRoundtable.turn_count || activeRoundtable.conversation_log?.length || 6;
-      const cooldownMs = 10000 + turnCount * 5000 + 15000; // walk + messages + reading buffer
+      const cooldownMs = 15000 + turnCount * 7000 + 30000; // 15s walk + turns*7s interval + 30s reading buffer
       if (Date.now() < finishedAt + cooldownMs) {
         return 'discussing';
       }
