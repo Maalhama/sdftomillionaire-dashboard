@@ -8,11 +8,15 @@ import { useAuth } from '@/lib/auth-context';
 
 const navLinks = [
   { href: '/gallery', label: 'galerie', desc: 'parcourir et voter' },
+  { href: '/downloads', label: 'outils', desc: 'télécharger les produits' },
+  { href: '/pricing', label: 'boutique', desc: 'acheter des crédits' },
+  { href: '/leaderboard', label: 'top', desc: 'meilleurs contributeurs' },
   { href: '/radar', label: 'suivi', desc: 'pipeline des idées' },
   { href: '/agents', label: 'agents', desc: 'les 6 IA autonomes' },
   { href: '/stage', label: 'QG', desc: 'salle 3D en direct' },
   { href: '/conversations', label: 'discussions', desc: 'conversations des agents' },
   { href: '/insights', label: 'blog', desc: 'articles et analyses' },
+  { href: '/accueil', label: 'FAQ', desc: 'questions fréquentes' },
 ];
 
 export default function Navbar() {
