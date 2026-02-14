@@ -14,11 +14,24 @@ useGLTF.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/'
 type InternalState =
   | 'idle'
   | 'working'
+  | 'quest-received'
   | 'walking-to-meeting'
   | 'meeting'
   | 'walking-to-waypoint'
   | 'pausing-at-waypoint'
   | 'returning-to-desk';
+
+// Encoded internal states for shared communication with HQRoom3D
+export const INTERNAL_STATE_CODES: Record<InternalState, number> = {
+  'idle': 0,
+  'working': 1,
+  'quest-received': 2,
+  'walking-to-meeting': 3,
+  'meeting': 4,
+  'walking-to-waypoint': 5,
+  'pausing-at-waypoint': 6,
+  'returning-to-desk': 7,
+};
 
 // Fisher-Yates shuffle
 function shuffleArray<T>(arr: T[]): T[] {
@@ -87,6 +100,7 @@ interface AgentModelProps {
   agentIndex?: number;
   collisionData?: CollisionData;
   sharedPositions?: Float32Array;
+  sharedInternalStates?: Float32Array;
   totalAgents?: number;
 }
 
@@ -102,6 +116,7 @@ export default function AgentModel({
   agentIndex = 0,
   collisionData,
   sharedPositions,
+  sharedInternalStates,
   totalAgents = 6,
 }: AgentModelProps) {
   const groupRef = useRef<THREE.Group>(null);
@@ -182,7 +197,9 @@ export default function AgentModel({
           const seat = meetingPositions[agentIndex % meetingPositions.length];
           b.meetingSeatX = seat[0];
           b.meetingSeatZ = seat[2];
-          startWalkTo(seat[0], seat[2], 'walking-to-meeting');
+          // Show "!" quest bubble for 2.5s before walking to meeting
+          b.internalState = 'quest-received';
+          b.stateTimer = 0;
         }
         break;
       }
@@ -227,7 +244,8 @@ export default function AgentModel({
       const seat = meetingPositions[agentIndex % meetingPositions.length];
       b.meetingSeatX = seat[0];
       b.meetingSeatZ = seat[2];
-      startWalkTo(seat[0], seat[2], 'walking-to-meeting');
+      b.internalState = 'quest-received';
+      b.stateTimer = 0;
     } else if (status === 'roaming' && roamWaypoints.length > 0) {
       b.shuffledWaypoints = shuffleArray(roamWaypoints);
       b.waypointIndex = 0;
@@ -502,6 +520,31 @@ export default function AgentModel({
         break;
       }
 
+      case 'quest-received': {
+        // Stay at current position with excited bounce for 2.5s
+        b.vx *= 0.85;
+        b.vz *= 0.85;
+
+        groupRef.current.position.x = b.px;
+        groupRef.current.position.z = b.pz;
+        // Excited bounce animation
+        const questBounce = Math.abs(Math.sin(t * 6 + b.bobPhase)) * 0.04;
+        groupRef.current.position.y = questBounce;
+        b.targetRotY = rotation[1] * Math.PI / 180;
+        b.currentRotY = THREE.MathUtils.lerp(b.currentRotY, b.targetRotY, 0.03);
+        groupRef.current.rotation.y = b.currentRotY;
+        groupRef.current.rotation.x = Math.sin(t * 4 + b.bobPhase) * 0.03;
+        groupRef.current.rotation.z = 0;
+        const questScale = 1 + Math.sin(t * 5) * 0.01;
+        groupRef.current.scale.set(scale * questScale, scale * questScale, scale * questScale);
+
+        // After 2.5s → walk to meeting
+        if (b.stateTimer >= 2.5) {
+          startWalkTo(b.meetingSeatX, b.meetingSeatZ, 'walking-to-meeting');
+        }
+        break;
+      }
+
       case 'meeting': {
         // Settle into seat
         b.px = THREE.MathUtils.lerp(b.px, b.meetingSeatX, 0.08);
@@ -563,6 +606,11 @@ export default function AgentModel({
     if (sharedPositions) {
       sharedPositions[agentIndex * 2] = b.px;
       sharedPositions[agentIndex * 2 + 1] = b.pz;
+    }
+
+    // Write internal state to shared array
+    if (sharedInternalStates) {
+      sharedInternalStates[agentIndex] = INTERNAL_STATE_CODES[b.internalState];
     }
 
     // Track divider side

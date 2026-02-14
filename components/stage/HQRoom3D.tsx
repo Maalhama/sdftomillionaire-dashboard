@@ -4,7 +4,7 @@ import { Suspense, useState, useRef, useCallback, Component, type ReactNode } fr
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, Grid, Html } from '@react-three/drei';
 import * as THREE from 'three';
-import AgentModel from './AgentModel';
+import AgentModel, { INTERNAL_STATE_CODES } from './AgentModel';
 
 // Error boundary for 3D rendering failures (mobile WebGL, model loading, etc.)
 class Room3DErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
@@ -163,6 +163,9 @@ const COLLISION_DATA: CollisionData = {
 
 // Shared agent positions array: 6 agents × 2 (x, z)
 const SHARED_POSITIONS = new Float32Array(12);
+
+// Shared internal states: 1 per agent (encoded via INTERNAL_STATE_CODES)
+const SHARED_INTERNAL_STATES = new Float32Array(6);
 
 // Roam waypoints — spread across both rooms with clear corridors
 const ROAM_WAYPOINTS: [number, number, number][] = [
@@ -1498,12 +1501,169 @@ function SpeechBubble({
   );
 }
 
+// ═══ QUEST BUBBLE ═══
+function QuestBubble({ position, name, color }: { position: [number, number, number]; name: string; color: string }) {
+  return (
+    <Html position={[position[0], position[1] + 2.2, position[2]]} center style={{ pointerEvents: 'none' }}>
+      <div className="select-none" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+        {/* Quest "!" bubble */}
+        <div
+          style={{
+            width: '26px',
+            height: '26px',
+            borderRadius: '50%',
+            background: '#ef4444',
+            border: '2px solid #f59e0b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 0 10px rgba(245, 158, 11, 0.6), 0 0 20px rgba(239, 68, 68, 0.3)',
+            animation: 'questBounce 0.8s ease-in-out infinite',
+          }}
+        >
+          <span style={{ color: '#fff', fontSize: '15px', fontWeight: 900, lineHeight: 1, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>!</span>
+        </div>
+        {/* Agent name tag */}
+        <div
+          className="font-mono"
+          style={{
+            fontSize: '7px',
+            fontWeight: 700,
+            color,
+            textShadow: `0 0 4px ${color}`,
+            opacity: 0.9,
+          }}
+        >
+          {name}
+        </div>
+      </div>
+      <style>{`
+        @keyframes questBounce {
+          0%, 100% { transform: translateY(0) scale(1); }
+          30% { transform: translateY(-6px) scale(1.1); }
+          60% { transform: translateY(-2px) scale(0.95); }
+        }
+      `}</style>
+    </Html>
+  );
+}
+
+// ═══ HABBO BUBBLE ═══
+function HabboBubble({
+  name, color, thought, position,
+}: {
+  name: string; color: string; thought: string; position: [number, number, number];
+}) {
+  // Light tint of agent color for background
+  const tintBg = `${color}0D`; // 5% opacity hex
+
+  return (
+    <Html position={[position[0], position[1] + 2.3, position[2]]} center style={{ pointerEvents: 'none' }}>
+      <div className="select-none" style={{ animation: 'habboAppear 0.3s ease-out forwards' }}>
+        <div
+          style={{
+            background: `linear-gradient(135deg, #fffef5, ${tintBg})`,
+            border: `2px solid ${color}`,
+            borderRadius: '14px',
+            padding: '6px 10px',
+            maxWidth: '170px',
+            minWidth: '80px',
+            boxShadow: `2px 3px 0px rgba(0, 0, 0, 0.15)`,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '6px',
+          }}
+        >
+          {/* Avatar circle */}
+          <div
+            style={{
+              width: '18px',
+              height: '18px',
+              minWidth: '18px',
+              borderRadius: '50%',
+              background: color,
+              boxShadow: `0 0 4px ${color}`,
+              marginTop: '1px',
+            }}
+          />
+          {/* Text content */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              className="font-mono"
+              style={{
+                fontSize: '10px',
+                fontWeight: 800,
+                color,
+                lineHeight: 1.2,
+                marginBottom: '1px',
+              }}
+            >
+              {name}:
+            </div>
+            <div
+              className="font-sans"
+              style={{
+                fontSize: '10px',
+                lineHeight: 1.3,
+                color: '#333',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                wordBreak: 'break-word',
+              }}
+            >
+              {thought}
+            </div>
+          </div>
+        </div>
+        {/* Speech pointer triangle */}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <div style={{
+            width: 0,
+            height: 0,
+            borderLeft: '6px solid transparent',
+            borderRight: '6px solid transparent',
+            borderTop: `8px solid ${color}`,
+            position: 'relative',
+            top: '-1px',
+          }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '-9px' }}>
+          <div style={{
+            width: 0,
+            height: 0,
+            borderLeft: '5px solid transparent',
+            borderRight: '5px solid transparent',
+            borderTop: '7px solid #fffef5',
+          }} />
+        </div>
+      </div>
+      <style>{`
+        @keyframes habboAppear {
+          0% { opacity: 0; transform: scale(0.7) translateY(4px); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+      `}</style>
+    </Html>
+  );
+}
+
 // ═══ AGENT STATION ═══
 const allDeskPositions = agentConfigs.map(c => c.position);
 
 function AgentStation({ config, configIndex }: { config: typeof agentConfigs[0]; configIndex: number }) {
+  const internalStateCode = SHARED_INTERNAL_STATES[configIndex];
+  const isQuestReceived = internalStateCode === INTERNAL_STATE_CODES['quest-received'];
+  const isMeeting = internalStateCode === INTERNAL_STATE_CODES['meeting'];
+  const isWalkingToMeeting = internalStateCode === INTERNAL_STATE_CODES['walking-to-meeting'];
+
   const showSleepBubble = config.status === 'idle';
-  const showSpeechBubble = config.status === 'working' || config.status === 'discussing';
+  const showWorkBubble = config.status === 'working';
+  const showQuestBubble = config.status === 'discussing' && isQuestReceived;
+  const showHabboBubble = config.status === 'discussing' && isMeeting;
+  // Show compact speech bubble while walking to meeting
+  const showWalkingBubble = config.status === 'discussing' && isWalkingToMeeting;
 
   return (
     <>
@@ -1520,6 +1680,7 @@ function AgentStation({ config, configIndex }: { config: typeof agentConfigs[0];
         agentIndex={configIndex}
         collisionData={COLLISION_DATA}
         sharedPositions={SHARED_POSITIONS}
+        sharedInternalStates={SHARED_INTERNAL_STATES}
         totalAgents={6}
       />
 
@@ -1536,18 +1697,45 @@ function AgentStation({ config, configIndex }: { config: typeof agentConfigs[0];
 
       <FloorRing position={config.position} color={config.color} />
 
+      {/* Idle → sleep bubble */}
       {showSleepBubble && (
         <SleepBubble position={config.position} name={config.name} color={config.color} />
       )}
-      {showSpeechBubble && (
+
+      {/* Working → standard speech bubble at desk */}
+      {showWorkBubble && (
         <SpeechBubble
           name={config.name}
           color={config.color}
           thought={config.thought}
           status={config.status}
-          position={config.status === 'discussing'
-            ? meetingSeatPositions[configIndex % meetingSeatPositions.length]
-            : config.position}
+          position={config.position}
+        />
+      )}
+
+      {/* Quest received → "!" bubble at desk */}
+      {showQuestBubble && (
+        <QuestBubble position={config.position} name={config.name} color={config.color} />
+      )}
+
+      {/* Walking to meeting → small name tag */}
+      {showWalkingBubble && (
+        <SpeechBubble
+          name={config.name}
+          color={config.color}
+          thought={config.thought}
+          status={config.status}
+          position={meetingSeatPositions[configIndex % meetingSeatPositions.length]}
+        />
+      )}
+
+      {/* At meeting → Habbo-style bubble */}
+      {showHabboBubble && (
+        <HabboBubble
+          name={config.name}
+          color={config.color}
+          thought={config.thought}
+          position={meetingSeatPositions[configIndex % meetingSeatPositions.length]}
         />
       )}
     </>
