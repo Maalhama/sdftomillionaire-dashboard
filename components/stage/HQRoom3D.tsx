@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState, useRef, useEffect, useCallback, Component, type ReactNode } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, Grid, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import AgentModel, { INTERNAL_STATE_CODES } from './AgentModel';
@@ -1713,8 +1713,14 @@ function HabboChatStack({ conversationLog, isDiscussing }: { conversationLog?: C
 // ═══ AGENT STATION ═══
 const allDeskPositions = agentConfigs.map(c => c.position);
 
-function AgentStation({ config, configIndex }: { config: typeof agentConfigs[0]; configIndex: number }) {
-  const internalStateCode = SHARED_INTERNAL_STATES[configIndex];
+function AgentStation({ config, configIndex, teleportToMeeting }: { config: typeof agentConfigs[0]; configIndex: number; teleportToMeeting: boolean }) {
+  // Poll the shared Float32Array via useFrame to trigger React re-renders on state changes
+  const [internalStateCode, setInternalStateCode] = useState(0);
+  useFrame(() => {
+    const code = SHARED_INTERNAL_STATES[configIndex];
+    if (code !== internalStateCode) setInternalStateCode(code);
+  });
+
   const isQuestReceived = internalStateCode === INTERNAL_STATE_CODES['quest-received'];
 
   const showSleepBubble = config.status === 'idle';
@@ -1738,6 +1744,7 @@ function AgentStation({ config, configIndex }: { config: typeof agentConfigs[0];
         sharedPositions={SHARED_POSITIONS}
         sharedInternalStates={SHARED_INTERNAL_STATES}
         totalAgents={6}
+        teleportToMeeting={teleportToMeeting}
       />
 
       {/* Chair at desk */}
@@ -1852,6 +1859,9 @@ export default function HQRoom3D({ liveAgents, conversationLog }: { liveAgents?:
     if (live) return { ...config, status: live.status, thought: live.thought };
     return config;
   });
+
+  // If conversation has turns, discussion is in progress → teleport agents to seats on mount
+  const discussionInProgress = (conversationLog?.length ?? 0) > 0;
 
   return (
     <Room3DErrorBoundary>
@@ -2032,6 +2042,7 @@ export default function HQRoom3D({ liveAgents, conversationLog }: { liveAgents?:
               key={config.id}
               config={config}
               configIndex={index}
+              teleportToMeeting={discussionInProgress}
             />
           ))}
 

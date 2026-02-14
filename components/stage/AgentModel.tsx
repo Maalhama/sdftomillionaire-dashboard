@@ -102,6 +102,7 @@ interface AgentModelProps {
   sharedPositions?: Float32Array;
   sharedInternalStates?: Float32Array;
   totalAgents?: number;
+  teleportToMeeting?: boolean;
 }
 
 export default function AgentModel({
@@ -118,6 +119,7 @@ export default function AgentModel({
   sharedPositions,
   sharedInternalStates,
   totalAgents = 6,
+  teleportToMeeting = false,
 }: AgentModelProps) {
   const groupRef = useRef<THREE.Group>(null);
   const { scene } = useGLTF(modelPath);
@@ -241,20 +243,26 @@ export default function AgentModel({
       sharedPositions[agentIndex * 2 + 1] = position[2];
     }
     if (status === 'discussing' && meetingPositions.length > 0) {
-      // On page load with discussing already active → teleport to meeting seat
       const seat = meetingPositions[agentIndex % meetingPositions.length];
       b.meetingSeatX = seat[0];
       b.meetingSeatZ = seat[2];
-      b.px = seat[0];
-      b.pz = seat[2];
-      b.internalState = 'meeting';
-      b.stateTimer = 0;
-      // Face the table center (7, 0, 0)
-      b.currentRotY = Math.atan2(7 - seat[0], 0 - seat[2]);
-      b.targetRotY = b.currentRotY;
-      if (sharedPositions) {
-        sharedPositions[agentIndex * 2] = seat[0];
-        sharedPositions[agentIndex * 2 + 1] = seat[2];
+
+      if (teleportToMeeting) {
+        // Discussion already has turns → teleport to meeting seat (page refresh mid-discussion)
+        b.px = seat[0];
+        b.pz = seat[2];
+        b.internalState = 'meeting';
+        b.stateTimer = 0;
+        b.currentRotY = Math.atan2(7 - seat[0], 0 - seat[2]);
+        b.targetRotY = b.currentRotY;
+        if (sharedPositions) {
+          sharedPositions[agentIndex * 2] = seat[0];
+          sharedPositions[agentIndex * 2 + 1] = seat[2];
+        }
+      } else {
+        // Fresh discussion (no turns yet) → play quest "!" animation then walk
+        b.internalState = 'quest-received';
+        b.stateTimer = 0;
       }
     } else if (status === 'roaming' && roamWaypoints.length > 0) {
       b.shuffledWaypoints = shuffleArray(roamWaypoints);
